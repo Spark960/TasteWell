@@ -1,0 +1,8 @@
+# Phase 0 probe shim: save this as probe/find_tags.cmd
+# Usage: probe\find_tags.cmd "jazz"
+# Requires: harness installed+configured per probe/README.md
+#
+@echo off
+if "%~1"=="" ( echo usage: find_tags.cmd "concept" & exit /b 1 )
+if not exist probe\out mkdir probe\out
+qloo exec find_tags --input-file probe\inputs\find_tags-intent.json --json > probe\out\find_tags.%~1.json 2>&1

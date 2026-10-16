@@ -1,0 +1,44 @@
+# secrets & env
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+
+# node
+node_modules/
+.next/
+out/
+.turbo/
+.vercel/
+
+# probe artifacts (raw outputs are disposable except committed fixtures)
+probe/out/
+probe/tmp/
+
+# traces/logs (may contain request payloads)
+*.trace.json
+trace.json
+logs/
+
+# os / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# caddy data
+deploy/data/
