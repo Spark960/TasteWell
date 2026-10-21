@@ -1,12 +1,14 @@
 # Qloo Contract — live-verified workflow shapes
 
 > Status: **LIVE-VERIFIED 2026-10-21 (P0)** against `hackathon.api.qloo.com` with
-> harness 0.1.26. Every entry below comes from a captured response in
-> `probe/out/` (gitignored raws). When the harness CLI differs from
-> IMPLEMENTATION.md §2.3, trust the CLI and update both.
+> harness 0.1.26. **MCP route live-verified 2026-10-21 (P2)** — tool names,
+> schemas and envelope parity confirmed over stdio. Every entry below comes
+> from captured responses (`probe/out/`, gitignored raws). When the harness
+> CLI differs from IMPLEMENTATION.md, trust the harness and update both.
 
 Capture method: `qloo exec <workflow> --input-file <json>` (files in
 `probe/inputs/`, runner `probe/run-probes.ps1` + `probe/run-resolved.ps1`).
+MCP capture: Python `mcp` SDK stdio client → `qloo mcp` (`backend/app/qloo/mcp_client.py`).
 Raw outputs: `probe/out/<operation>.<variant>.json`.
 
 ## Harness facts (live-verified P0)
@@ -37,6 +39,28 @@ Raw outputs: `probe/out/<operation>.<variant>.json`.
   ambiguous names → `needs_input` with candidates → re-run with UUID.
 
 ## Workflows
+
+### 0. MCP surface (live-verified P2)
+- `qloo mcp` exposes exactly **10 tools**: `qloo_capabilities` + the 9
+  workflows below, names = `qloo_<workflow>`. `inputSchema.required` per tool:
+  find_tags[query] · describe[entity] · recommend[target_type] ·
+  rank[options,option_type] · where_popular[entity,within] ·
+  compare_audiences[group_a,group_b] · audience_demographics[entity] ·
+  entity_tags[entities] · trends[entities,entity_type,start_date,end_date].
+- `qloo_capabilities` returns a **raw contract manifest** — NOT a 6-status
+  envelope: `{manifest_schema_version:"1.1", contract_version:"1.0.0",
+  capabilities_tool, result_schema_version:"1.0-preview.1", result_schema,
+  operations[9], upstream, contract_checksum, adapter}`. Treat presence as ok.
+- Data-tool envelopes over MCP are **identical** to `qloo exec` (same fields,
+  same statuses) — one normalizer serves both routes.
+- MCP-only quirks: `recommend` with `demographic` but no `signal_location` →
+  `needs_input`, **zero candidates**, summary: "Demographic Qloo signals
+  require signal_location so the audience geography is explicit" (self-heal:
+  re-call with location). `audience_demographics` on a TAG URN (not an
+  entity) → `needs_input`, zero candidates (abstain, not a picker case).
+- env must carry `QLOO_API_KEY` + base URLs into the spawn (mcp_client does
+  `os.environ` + setdefault).
+
 
 ### 1. find_tags
 - real invocation: `qloo exec find_tags --input-file probe/inputs/...json`

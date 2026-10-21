@@ -27,8 +27,10 @@ class Settings(BaseSettings):
     qloo_max_retries: int = 2
 
     llm_provider: str = "gemini"
+    llm_model: str = ""  # override provider default (e.g. separate quota bucket)
     gemini_api_key: str = ""
     openai_api_key: str = ""
+    groq_api_key: str = ""
 
     def require_qloo_key(self) -> str:
         if not self.qloo_api_key and self.app_env != "dev":

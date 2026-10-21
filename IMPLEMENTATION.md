@@ -17,7 +17,7 @@
 |---|---|---|---|
 | P0 | Harness spike: install, env vars, first probes, record contract | ✅ done 2026-10-21 | every planned Qloo call verified live |
 | P1 | Integration layer: Python wrapper around `qloo exec` + status normalizer | ✅ done 2026-10-21 | mock tests green (22) + live adapter call ok |
-| P2 | Agent loop: FastAPI ↔ `qloo mcp` stdio, tools, grounding contract, abstain policy, CLI test runner | ☐ | one brief → full concept via CLI |
+| P2 | Agent loop: FastAPI ↔ `qloo mcp` stdio, tools, grounding contract, abstain policy, CLI test runner | ✅ done 2026-10-21 | one brief → full concept via CLI |
 | P3 | HTTP layer: FastAPI endpoints + SSE trace + Qloo-off toggle | ☐ | curl-able end to end |
 | P4 | Next.js UI: brief form, side-by-side, trace panel, disambiguation picker | ☐ | demoable locally |
 | P5 | Deploy: EC2 t3.micro + Docker Compose + Caddy + DuckDNS TLS | ☐ | public URL, HTTPS, external smoke test |
@@ -175,8 +175,10 @@ QLOO_TRUSTED_BASE_URL=https://hackathon.api.qloo.com
 
 # Agent brain (Gemini Flash free tier; OpenAI-compatible swap interface)
 LLM_PROVIDER=gemini
+LLM_MODEL=            # optional; free-tier quota is per-model (see §10)
 GEMINI_API_KEY=
 OPENAI_API_KEY=
+GROQ_API_KEY=
 
 # App
 APP_ENV=dev
@@ -277,16 +279,19 @@ Tasks:
 7. CLI test: `python -m app.agent.cli "natural wine bar" --audience millennials --region Brooklyn` → concept brief + `trace.json` saved.
 
 Verify checklist:
-- [ ] Readiness check passes without Qloo call
-- [ ] One full brief end-to-end via CLI, all claims traceable to evidence ids
-- [ ] `needs_input` path exercised (feed an ambiguous seed, e.g. "jazz" tag choice) and the CLI asks/consumes a user choice
-- [ ] Qloo-off run completes and is obviously generic (sanity for the differentiator)
-- [ ] Trace file contains timestamps, workflows, envelope statuses
+- [x] Readiness check passes without Qloo call (live: `qloo_capabilities` → ok, 9 operations, contract 1.0.0; also `list_tools` → 10 tools)
+- [x] One full brief end-to-end via CLI, all claims traceable to evidence ids (live grounded run: 10 tool calls, every section sentence carries `(id:…)` citations; `evidence[]` built from real envelope statuses, not model claims)
+- [x] `needs_input` path exercised — live: `qloo_describe("Williamsburg")` → needs_input, CLI printed the 5 locality candidates (ask ✓); pick consumption via `--pick <id>` (mock chain test covers the consume-and-continue path — live reruns are trajectory-dependent, the model may avoid the ambiguous call)
+- [x] Qloo-off run completes and is obviously generic (live `--mode generic`: "Evidence: none — this brief is ungrounded")
+- [x] Trace file contains timestamps, workflows, envelope statuses (live trace: status/llm/tool_call/tool_result/final events with ts, status chips, correlation ids)
 
 Resume context:
-- Done: —
-- In flight: —
-- Next command: `cd backend && python -m app.agent.cli "listening bar" --region "Williamsburg" --audience millennials`
+- Done: `app/qloo/mcp_client.py` (stdio MCP client, injectable session, capabilities-readiness special-case since `qloo_capabilities` returns a raw manifest not a 6-status envelope, env = dict(os.environ) + QLOO_API_KEY/base-URL injection, LRU-free bounded retries 0.5s/1s on retryable envelope errors); `app/agent/provider.py` (OpenAI-compatible shim: gemini | openai | groq, tool-calling, 429 honors Retry-After + 5xx/transport bounded backoff ≤2, configurable model); `app/agent/tools.py` (GroundedTools: LLM specs generated from live `list_tools` schemas, compact model-facing payloads, evidence[] from real envelopes, NO_SUCH_TOOL + TOOL_CRASH honest errors); `app/agent/loop.py` (AgentRunner: grounding system prompt with hard rules, step budget 10, needs_input chooser hook + resume, final JSON parse tolerant to fences/prose, generic "Qloo-off" mode, wire_tool_call re-serialization); `app/agent/cli.py` (CLI: brief/region/audience/--mode/--pick/--trace/--out, exit codes 0/2/3, needs_input interactive prompt, human-readable brief print); `app/trace.py`; tests: test_mcp_client.py (9) + test_provider.py (11) + test_agent_loop.py (7) — 48 passed + 1 live-skipped total.
+- Live gates: grounded brief ✓ (run 20261021T113833: "listening bar"·Williamsburg·millennials, 10 tool calls, cites everywhere, honest abstain on demographics), `--pick` grounded brief ✓ (15 tool calls incl. live QLOO_TIMEOUT retry recovery), generic ✓. Artifacts in probe/out/ (live_brief*.json + live_trace*.json, gitignored).
+- Learned (this session): (1) `qloo mcp` spawns fine from Python stdio (`qloo.CMD` + mcp 2.3.0 pkg — the py SDK angle-brackets attrs are snake_case: `server_info`, `input_schema`, `is_error`); (2) Gemini 3.x OpenAI-compat requires echoing `extra_content.google.thought_signature` verbatim (message + tool_call) or the next turn 400s — provider now passthroughs it; (3) Gemini 3.x counts hidden thinking tokens against max_tokens → 2k cap truncates output mid-string (finish_reason: length) — provider default now 16384; (4) free-tier RPD is only **20 req/day per model** (gemini-3.8-flash AND gemini-3.6-flash each own tiny buckets; both drained 2026-10-21, reset ~19h) — dev sparingly: `LLM_MODEL` env picks the bucket (e.g. `gemini-3.6-flash`); OPENAI/GROQ keys are empty placeholders in .env — severity for P3+: one brief ≈ 6–8 LLM turns, so grounded+generic side-by-side in P4 either caches hard or needs a paid/Groq fallback; (5) `recommend` with `demographic` but no `signal_location` → needs_input "Demographic Qloo signals require signal_location so the audience geography is explicit" (0 candidates, summary carries the instruction); (6) `audience_demographics` on a tag URN → needs_input with **zero candidates** (abstain-case, not a picker case); (7) LLM-level 429s + 503s are routine on free tier — provider retries; persistent RPD exhaustion = honest abort.
+- In flight: none — P2 complete.
+- Next: P3, next command `cd backend && pip install fastapi uvicorn httpx (done) && uvicorn app.main:app — build app/main.py + api/routes.py first`
+- Env note: `$env:LLM_MODEL="gemini-3.6-flash"` before any agent run; both gemini buckets RPD=20/model/day. Trace/brief JSONs default to cwd (backend/trace.json) — move to probe/out if keeping.
 ---
 
 ### P3 — HTTP layer (Oct 22–24)
@@ -485,4 +490,5 @@ echo SMOKE-PASS
 - Windows dev machine quirk: PATH for subprocess → if backend can't find `qloo` in tests, capture from `where.exe qloo` and set `QLOO_BIN` env fallback in settings. (`resolve_qloo_bin()` in `backend/app/qloo/adapter.py` now does this automatically via `shutil.which`.)
 - Dev-machine Python hygiene (P1 finding): bare `python` on PATH is a stale venv from an unrelated project with a broken pip TLS path. Always use `py -3.12` here. Never `pip install` into a foreign venv.
 - PS 5.1 `>` and `Out-File` default to UTF-16 LE BOM: any captured probe JSON through them needs re-encoding to UTF-8 (fixtures in backend/tests/fixtures are already UTF-8; prefer `-Encoding utf8` or Set-Content over raw `>`).
+- Gemini free-tier (P2 findings): think about LLM quota like Qloo quota — RPD **20/model**, RPD counters independent per model id (`LLM_MODEL` picks the bucket); hidden thinking tokens burn `max_tokens` (provider defaults 16384); tool-calling turns MUST echo `extra_content.google.thought_signature` (provider handles this — never strip unknown message fields).
 - Quota hygiene: batch small; always reuse cache; never rapid-loop workflows for fun.
