@@ -47,16 +47,7 @@ except through citations.
 """
 
 
-def _system_prompt(mode: str) -> str:
-    if mode == "generic":
-        return (
-            "You are Tastewell but QLOO IS OFF — you have NO tools and NO "
-            "taste data. Write the concept brief from general knowledge "
-            "alone. Every claim is your guess; you have no evidence ids."
-            "\n" + _SYSTEM_RULES.split("\n\n", 1)[1]
-        )
-    return _SYSTEM_RULES + """
-
+_REPLY_SHAPE = """
 Respond with ONLY a JSON object (no markdown fence, no prose) shaped:
 {
   "audience_profile": string,          // aggregate framing
@@ -70,6 +61,24 @@ Respond with ONLY a JSON object (no markdown fence, no prose) shaped:
   },
   "honest_absences": [string]          // sections you are abstaining on
 }
+"""
+
+_GENERIC_SHAPE = """
+Each string in a section must stay in aggregate framing. Every claim is your
+guess — you have no evidence ids, so do NOT add "(id:…)" citations to sections.
+"""
+
+
+def _system_prompt(mode: str) -> str:
+    if mode == "generic":
+        return (
+            "You are Tastewell but QLOO IS OFF — you have NO tools and NO "
+            "taste data. Write the concept brief from general knowledge "
+            "alone. Every claim is your guess; you have no evidence ids."
+            "\n" + _SYSTEM_RULES.split("\n\n", 1)[1]
+            + _REPLY_SHAPE + _GENERIC_SHAPE
+        )
+    return _SYSTEM_RULES + _REPLY_SHAPE + """
 Each string in a section may end with " (id:<id>)" citations; tag_themes "
 entries must carry the tag URN. If nothing grounded, return mostly-empty
 sections plus honest_absences."""

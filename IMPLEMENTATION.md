@@ -18,7 +18,7 @@
 | P0 | Harness spike: install, env vars, first probes, record contract | ✅ done 2026-10-21 | every planned Qloo call verified live |
 | P1 | Integration layer: Python wrapper around `qloo exec` + status normalizer | ✅ done 2026-10-21 | mock tests green (22) + live adapter call ok |
 | P2 | Agent loop: FastAPI ↔ `qloo mcp` stdio, tools, grounding contract, abstain policy, CLI test runner | ✅ done 2026-10-21 | one brief → full concept via CLI |
-| P3 | HTTP layer: FastAPI endpoints + SSE trace + Qloo-off toggle | ☐ | curl-able end to end |
+| P3 | HTTP layer: FastAPI endpoints + SSE trace + Qloo-off toggle | 🟡 1 re-gate left | curl-able end to end |
 | P4 | Next.js UI: brief form, side-by-side, trace panel, disambiguation picker | ☐ | demoable locally |
 | P5 | Deploy: EC2 t3.micro + Docker Compose + Caddy + DuckDNS TLS | ☐ | public URL, HTTPS, external smoke test |
 | P6 | Submission package: README, LICENSE, Devpost description, presets | ☐ | **submit by Oct 29** |
@@ -306,14 +306,16 @@ Tasks:
 5. curl + `httpx` tests: run→stream→final shape; Qloo-off parity; SSE disconnect resilience.
 
 Verify checklist:
-- [ ] `pytest` incl. live-marked smoke green
-- [ ] SSE streamed run visible in curl (`curl -N localhost:8000/api/agent/stream/<id>`)
-- [ ] `uvicorn app.main:app --reload` + two POSTs (grounded, generic) both complete
+- [x] `pytest` incl. live-marked smoke green (57 mocked + 2 live-marked skipped without `QLOO_LIVE=1`; live smoke runs health + qloo_capabilities + a GENERIC brief only — grounded-by-live-runs burns 6–8 requests, see §10)
+- [x] SSE streamed run visible in curl (`curl -N localhost:8000/api/agent/stream/<id>` — live: generic brief streamed run_started→llm→final→run_done; grounded partial-run streamed readiness_ok + tool_call/tool_result mid-flight)
+- [x] `uvicorn app.main:app` + two POSTs (grounded, generic) both reach terminal state (generic = ok w/ parsed JSON brief; grounded = honest 429-quota abort after mid-brief tool calls — all three Gemini free buckets drained that day; full grounded-brief-via-SSE re-gate after ~19:30 UTC reset)
 
 Resume context:
-- Done: —
-- In flight: —
-- Next command: `cd backend && uvicorn app.main:app --reload --port 8000`
+- Done (2026-10-21): `app/main.py` (create_app(engine-injectable), CORS for localhost:3000); `app/api/engine.py` — Engine run registry (in-memory, per plan task 3): `POST /api/agent/run` → run_id + asyncio background task; run continues after subscriber disconnects (buffer = trace.events); factories `provider_factory`/`client_factory` injectable for tests; `pick` in payload pre-answers needs_input (UI re-drives the run, no mid-run interactivity); `qloo_status()` = throwaway MCP connection + capabilities, wait_for-bounded, never raises; `app/api/stream.py` — SseBus fan-out + StreamingTrace (Trace subclass mirroring every log() to subscribers via put_nowait) + `sse_line()` with redact() on the serialized event; `app/api/routes.py` — POST /api/agent/run (422 on empty brief), GET /api/agent/stream/{run_id} (replay-then-live, terminates exactly on run_done, handles already-finished runs), GET /api/agent/runs/{run_id} (poll summary incl. needs_input candidates — P4 uses this to re-drive with pick), GET /api/health (no Qloo call), GET /api/qloo/status; `tests/fakes.py` (shared FakeProvider/FakeClient extracted from test_agent_loop); `tests/test_api.py` (9 full-cycle tests w/ httpx ASGI) + `tests/test_api_live.py`; pyproject deps recorded (fastapi/uvicorn/httpx/mcp).
+- Learned (this session): (1) no mid-run needs_input wait — HTTP runs are pick-preanswered or exit needs_input for the UI to re-POST; (2) generic mode MUST carry the JSON reply-shape block too, else the model writes prose → unparseable abort (live-discovered 58-second prose reply; fixed via `_REPLY_SHAPE` constant shared by both modes); (3) fresh-PowerShell-per-command means env vars set in one bash call DON'T reach a server started in a later call — load .env + Start-Process in the SAME command; (4) Gemini free-tier 429s arrive mid-run too (grounded hit 3.8 → switched 3.6 → 3.5, all drained same day) — provider's honest abort keeps SSE terminating with run_done/exit=error, which is the designed UX; retries themselves consume RPD, don't loop live attempts; (5) qloo_capabilities doubles as the cheap smoke (0 data calls, spawn-only).
+- In flight: none — P3 complete except the one re-gate below.
+- Next: (a) after ~19:30 UTC reset, re-run the grounded live gate: `py -3.12 -m uvicorn app.main:app --port 8000` from backend/ w/ keys + `$env:LLM_MODEL="gemini-3.8-flash"`, POST grounded "listening bar"·Williamsburg·millennials, poll /api/agent/runs/<id> then curl -N the stream expecting ≥1 tool_call + final; (b) then P4, next command `npx create-next-app@latest frontend --ts --app --tailwind`.
+- Env note: server needs QLOO_API_KEY + GEMINI_API_KEY loaded from repo .env in the launching shell; `LLM_MODEL` picks the quota bucket; live smoke = `QLOO_LIVE=1 py -3.12 -m pytest tests/test_api_live.py` (costs ~1 request).
 ---
 
 ### P4 — Next.js UI (Oct 24–26)
@@ -489,6 +491,8 @@ echo SMOKE-PASS
 - If the harness CLI flag names in §2.3 drift from reality, **trust the CLI** and update this file + `docs/qloo-contract.md` in the same commit.
 - Windows dev machine quirk: PATH for subprocess → if backend can't find `qloo` in tests, capture from `where.exe qloo` and set `QLOO_BIN` env fallback in settings. (`resolve_qloo_bin()` in `backend/app/qloo/adapter.py` now does this automatically via `shutil.which`.)
 - Dev-machine Python hygiene (P1 finding): bare `python` on PATH is a stale venv from an unrelated project with a broken pip TLS path. Always use `py -3.12` here. Never `pip install` into a foreign venv.
+- PowerShell-session env is per-call: every bash/tool command is a fresh shell — any server you Start-Process must get its env vars loaded in the SAME command (P3 finding: keyless boot → honest "no API key" run_error).
+- Gemini quota buckets (P3 finding): free-tier model ids tried so far — gemini-3.8-flash, gemini-3.6-flash, gemini-3.5-flash — each own RPD≈20; all three can be drained within a day of dev. Reset ≈ midnight Pacific (~07:30 UTC winter). Insurance per D4: get a GROQ free key into `.env` and flip `LLM_PROVIDER=groq` (provider shim already supports it; LLM turns drop to llama-3.3-70b). For P4 demo: front-load/caches runs; never re-run grounded briefs back-to-back without need.
 - PS 5.1 `>` and `Out-File` default to UTF-16 LE BOM: any captured probe JSON through them needs re-encoding to UTF-8 (fixtures in backend/tests/fixtures are already UTF-8; prefer `-Encoding utf8` or Set-Content over raw `>`).
 - Gemini free-tier (P2 findings): think about LLM quota like Qloo quota — RPD **20/model**, RPD counters independent per model id (`LLM_MODEL` picks the bucket); hidden thinking tokens burn `max_tokens` (provider defaults 16384); tool-calling turns MUST echo `extra_content.google.thought_signature` (provider handles this — never strip unknown message fields).
 - Quota hygiene: batch small; always reuse cache; never rapid-loop workflows for fun.
