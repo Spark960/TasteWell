@@ -16,7 +16,7 @@
 | Phase | What it is | Status | Gate |
 |---|---|---|---|
 | P0 | Harness spike: install, env vars, first probes, record contract | ✅ done 2026-10-21 | every planned Qloo call verified live |
-| P1 | Integration layer: Python wrapper around `qloo exec` + status normalizer | ☐ | mock tests green |
+| P1 | Integration layer: Python wrapper around `qloo exec` + status normalizer | ✅ done 2026-10-21 | mock tests green (22) + live adapter call ok |
 | P2 | Agent loop: FastAPI ↔ `qloo mcp` stdio, tools, grounding contract, abstain policy, CLI test runner | ☐ | one brief → full concept via CLI |
 | P3 | HTTP layer: FastAPI endpoints + SSE trace + Qloo-off toggle | ☐ | curl-able end to end |
 | P4 | Next.js UI: brief form, side-by-side, trace panel, disambiguation picker | ☐ | demoable locally |
@@ -251,14 +251,16 @@ Tasks:
 6. Tests: fixtures from `probe/out/` JSONs; success, needs_input, empty, degraded, error-retryable-retry, error-nonretryable-abstain; subprocess failure/timeout simulation.
 
 Verify checklist:
-- [ ] `pytest` green (mocked; no key needed)
-- [ ] Integration test (marked live, skipped without env): one real `find_tags` through adapter returns normalized data
-- [ ] `.env` never touched in test runs for mocked tests
+- [x] `pytest` green (mocked; no key needed) — 22 passed, 0.5s
+- [x] Integration test (marked live, skipped without env): one real `find_tags` through adapter returns normalized data (`QLOO_LIVE=1` + key in env → passed)
+- [x] `.env` never touched in test runs for mocked tests (settings test chdirs to tmp_path)
 
 Resume context:
-- Done: —
-- In flight: —
-- Next command: `cd backend && pytest -m "not live" -s`
+- Done: `backend/` scaffolded (Python 3.12, pyproject, pytest-timeout); `app/settings.py` (pydantic-settings, §4 schema, fail-fast on missing key in non-dev); `app/qloo/normalizer.py` (envelope→`NormalizedResult`; handles no-`status` error envelopes, needs_input candidates extraction, compare_audiences single-object results wrap, trends `series[]` as `.data`); `app/qloo/adapter.py` (`qloo exec --input-file` subprocess runner, LRU+TTL cache keyed workflow+payload-hash, ≤2 exponential-backoff retries only when `error.retryable`/transport-failure, injectable runner/sleep/clock); `app/qloo/redact.py` (registered-secret + bearer/key-ish scrubbing); tests in `tests/test_adapter.py` + 12 fixture JSONs copied from probe/out into `tests/fixtures/` (committed, UTF-8).
+- Learned (this session): (1) bare `python` on PATH is actually another project's venv (`alpaca26`) — use **`py -3.12`** (system 3.12.10; had no pip, bootstrapped via `ensurepip`); (2) that stale venv's pip has a broken TLS path (SSL EOF on pypi even though curl works) — venv deleted, install deps with `py -3.12 -m pip install`; (3) PS 5.1 `>` redirection writes **UTF-16 LE BOM** — all probe/out JSONs were UTF-16 (why the earlier "binary file" read); fixtures were re-encoded to UTF-8 in `tests/fixtures/`; (4) bare `qloo` fails in subprocess (`WinError 2`, npm shim) → `resolve_qloo_bin()` uses `shutil.which` (`qloo.cmd` runs fine); (5) missing `QLOO_BASE_URL`/`QLOO_TRUSTED_BASE_URL` (they're in `$PROFILE`, not session env) gives misleading `QLOO_AUTH` — adapter now injects them into the subprocess env via `setdefault`.
+- In flight: none — P1 complete.
+- Next: P2, next command `cd backend && py -3.12 -m pip install mcp fastapi uvicorn && python -m app.agent.cli "listening bar" --region "Williamsburg" --audience millennials` (CLI runner to be built first)
+- Env note for any shell running qloo/adapter: `$env:QLOO_API_KEY = ((Get-Content ..\.env) -match '^QLOO_API_KEY=' | Select-Object -First 1).Substring('QLOO_API_KEY='.Length).Trim()` (probe runners do this at lines 4–8; adapter injects base URLs itself).
 ---
 
 ### P2 — Agent loop via `qloo mcp` (Oct 19–22)
@@ -480,5 +482,7 @@ echo SMOKE-PASS
 - **Never** commit keys; `git add` checks in flights: `git status` before every commit while `.env` exists early.
 - Anything private/knowledge-worthy goes to this file or docs/, never to chat-only memory.
 - If the harness CLI flag names in §2.3 drift from reality, **trust the CLI** and update this file + `docs/qloo-contract.md` in the same commit.
-- Windows dev machine quirk: PATH for subprocess → if backend can't find `qloo` in tests, capture from `where.exe qloo` and set `QLOO_BIN` env fallback in settings.
+- Windows dev machine quirk: PATH for subprocess → if backend can't find `qloo` in tests, capture from `where.exe qloo` and set `QLOO_BIN` env fallback in settings. (`resolve_qloo_bin()` in `backend/app/qloo/adapter.py` now does this automatically via `shutil.which`.)
+- Dev-machine Python hygiene (P1 finding): bare `python` on PATH is a stale venv from an unrelated project with a broken pip TLS path. Always use `py -3.12` here. Never `pip install` into a foreign venv.
+- PS 5.1 `>` and `Out-File` default to UTF-16 LE BOM: any captured probe JSON through them needs re-encoding to UTF-8 (fixtures in backend/tests/fixtures are already UTF-8; prefer `-Encoding utf8` or Set-Content over raw `>`).
 - Quota hygiene: batch small; always reuse cache; never rapid-loop workflows for fun.
