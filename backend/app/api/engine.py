@@ -162,6 +162,9 @@ class Engine:
                 tools=tools,
                 trace=state.trace,
                 chooser=self._chooser(req),
+                # server runs get headroom: multi-tool batches + Groq
+                # corrective-retry nudges each burn a step
+                max_steps=18,
             )
             brief_req = BriefRequest(
                 brief=req.brief, region=req.region, audience=req.audience,

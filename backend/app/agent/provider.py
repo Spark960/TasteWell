@@ -21,6 +21,17 @@ log = logging.getLogger("tastewell.llm")
 
 _MAX_429_RETRIES = 2
 
+_TOOL_VALIDATION = "Tool call validation failed"
+
+_SCHEMA_NUDGE = (
+    "Your previous tool call was rejected because its arguments did not "
+    "match the tool's declared input schema. Re-issue the tool call with "
+    "arguments matching the schema exactly: use only the listed enum values "
+    "(e.g. entity_type must be one of artist/book/brand/movie/person/place/"
+    "podcast/tv_show/videogame/locality) and include every required field. "
+    "If unsure, omit optional fields rather than guessing."
+)
+
 
 @dataclass
 class Reply:
@@ -51,11 +62,11 @@ PROVIDERS: dict[str, dict[str, str]] = {
         "default_model": "gpt-4.1-mini",
         "key_field": "openai_api_key",
     },
-    "groq": {
-        "base_url": "https://api.groq.com/openai/v1",
-        "default_model": "llama-3.3-70b-versatile",
-        "key_field": "groq_api_key",
-    },
+        "groq": {
+            "base_url": "https://api.groq.com/openai/v1",
+            "default_model": "openai/gpt-oss-120b",
+            "key_field": "groq_api_key",
+        },
 }
 
 
@@ -102,6 +113,25 @@ class LlmProvider:
             body["tools"] = tools
             body["tool_choice"] = "auto"
         resp = await self._post(body)
+        # Groq validates the model's proposed tool args against the schema
+        # and 400s strict (Gemini tolerates slips) — these are random model
+        # mistakes: bounded corrective retries, never a user-visible abort.
+        if resp.status_code == 400 and _TOOL_VALIDATION in resp.text:
+            for attempt in range(2):
+                log.warning(
+                    "llm tool-args schema slip — corrective retry %d/2",
+                    attempt + 1,
+                )
+                nudged = {
+                    **body,
+                    "messages": [
+                        *messages, {"role": "user", "content": _SCHEMA_NUDGE},
+                    ],
+                }
+                resp = await self._post(nudged)
+                if not (resp.status_code == 400
+                        and _TOOL_VALIDATION in resp.text):
+                    break
         if resp.status_code in (401, 403):
             raise ProviderConfigError(
                 f"LLM rejected credentials (HTTP {resp.status_code})"
