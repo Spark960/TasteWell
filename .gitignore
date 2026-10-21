@@ -27,6 +27,7 @@ out/
 # probe artifacts (raw outputs are disposable except committed fixtures)
 probe/out/
 probe/tmp/
+probe/inputs/
 
 # traces/logs (may contain request payloads)
 *.trace.json

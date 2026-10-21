@@ -15,7 +15,7 @@
 
 | Phase | What it is | Status | Gate |
 |---|---|---|---|
-| P0 | Harness spike: install, env vars, first probes, record contract | ☐ not started | every planned Qloo call verified live |
+| P0 | Harness spike: install, env vars, first probes, record contract | ✅ done 2026-10-21 | every planned Qloo call verified live |
 | P1 | Integration layer: Python wrapper around `qloo exec` + status normalizer | ☐ | mock tests green |
 | P2 | Agent loop: FastAPI ↔ `qloo mcp` stdio, tools, grounding contract, abstain policy, CLI test runner | ☐ | one brief → full concept via CLI |
 | P3 | HTTP layer: FastAPI endpoints + SSE trace + Qloo-off toggle | ☐ | curl-able end to end |
@@ -81,7 +81,7 @@ newly learned Qloo fact → `docs/qloo-contract.md`.
 | compare_audiences | group_a vs group_b → differences | "how locals differ from the audience profile" |
 | audience_demographics | audience → demographic affinities | audience profile rendering |
 | entity_tags | entity → its tags | build taste profile from seed entities |
-| trends | entity_type + 1–5 entities + date range | "is this concept rising?" credibility check |
+| trends | entity_type + 1–5 entities + date range | "is this concept rising?" credibility check (**live P0: `entity_type:"place"` → `QLOO_CONTRACT` non-retryable error — use artist/brand/locality, not place**) |
 
 ### 2.4 MCP tool surface (`qloo mcp`; tool names `qloo_*`)
 - Chain shape (canonical, from kit): `qloo_find_tags`/`qloo_describe` → **confirm with user** → `qloo_recommend` / `qloo_rank` / `qloo_where_popular` / `qloo_compare_audiences`.
@@ -224,16 +224,18 @@ Tasks:
 7. Record per-workflow: input schema, sample raw JSON output, envelope when a query should be empty (e.g. deliberately obscure concept), error JSON on empty `--input` (safe, no key effect), and rate-limit/429 behavior if JSON mentions it.
 
 Verify checklist:
-- [ ] `qloo --version` ≥ 0.1.26
-- [ ] `qloo setup --status` shows "Qloo data: ready"
-- [ ] All 9 workflows executed live at least once; outputs saved under `probe/out/`
-- [ ] `docs/qloo-contract.md` has input+output shapes per workflow, updated §2.3 names if the real names differ
-- [ ] One empty-result case captured (proves abstain path is testable)
+- [x] `qloo --version` ≥ 0.1.26 (harness 0.1.26 on Node v22.23.2; winget-upgraded from 22.17.1)
+- [x] `qloo setup --status` shows "Qloo data: ready" (via `QLOO_API_KEY` env var — "ready (environment)"; interactive setup needs a TTY so the env-var route from §2.1 is the working path on dev too; nothing stored to harness config; re-load key from `.env` per session)
+- [x] All 9 workflows executed live at least once; outputs saved under `probe/out/`
+- [x] `docs/qloo-contract.md` has input+output shapes per workflow; §2.3 names verified — no rename drift; trends/place limitation noted
+- [x] One empty-result case captured (find_tags `semantic:false` → `ok`, result_count:0)
 
 Resume context:
-- Done: *(fill before leaving or ensure fresh start)*
-- In flight: *e.g. "describe probe — unknown response shape"*
-- Next command: `qloo setup --status` (always safe, non-mutating)
+- Done: probes for all 9 workflows live (2026-10-21); 21 raw JSONs in probe/out/ (gitignored); contract doc filled; run scripts probe/run-probes.ps1 + probe/run-resolved.ps1 committed; .gitignore covers probe/inputs/.
+- Learned: PS 5.1 breaks inline `--input` JSON through the npm qloo.ps1 shim → always `--input-file`. `needs_input` = name ambiguity → candidates with UUIDs → re-call with UUID works (canonical disambiguation chain, drives D12). QLOO_AUTH is checked before input schema (empty-input error needs key set). compare_audiences: results is one object (tags[], a, b, matchEntities), no result_count. audience_demographics values are signed affinities. trends: works for artist; place rejected (QLOO_CONTRACT). Exactly-empty only via `semantic:false` (semantic search fuzzes to 10 hits).
+- In flight: none — P0 complete.
+- Next: P1 phase, next command `# scaffold backend/ (P1 tasks 1–2): pyproject + settings`, then `cd backend && pytest -m "not live" -s`
+- Session env note: PowerShell $PROFILE sets QLOO_BASE_URL/QLOO_TRUSTED_BASE_URL permanently; the API key must be loaded from .env into `$env:QLOO_API_KEY` before any qloo call in a fresh session (see probe/run-probes.ps1 lines 4–8 for the pattern).
 ---
 
 ### P1 — Integration layer (Oct 17–19)
