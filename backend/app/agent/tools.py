@@ -7,7 +7,6 @@ full envelopes stay in trace + evidence.
 
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any, Awaitable, Callable
 
@@ -22,6 +21,40 @@ _MODEL_KEYS = (
     "id", "name", "type", "subtype", "entity_id", "popularity",
     "affinity", "affinity_rank", "description",
 )
+
+# Default LLM-facing tool subset (token budget: the full live surface is
+# ~10.2k chars of schemas; Groq free tier allows 8k tokens/min, so each extra
+# schema costs whole steps/min). This four-tool chain covers the brief:
+# concept -> tags -> recommendations -> catchment. Entity-only tools
+# (entity_tags/audience_demographics/trends/rank/compare_audiences) are
+# excluded because tag URNs cannot feed them and they caused dead-end loops.
+DEFAULT_LLM_TOOLS: tuple[str, ...] = (
+    "qloo_find_tags",
+    "qloo_describe",
+    "qloo_recommend",
+    "qloo_where_popular",
+)
+
+# Args that require REAL entities (ids or names) — tag URNs are invalid there
+# and always return zero-candidate needs_input (live-verified 2026-10-22).
+_ENTITY_ONLY_ARGS: dict[str, tuple[str, ...]] = {
+    "qloo_describe": ("entity",),
+    "qloo_entity_tags": ("entities",),
+    "qloo_audience_demographics": ("entity",),
+    "qloo_where_popular": ("entity",),
+    "qloo_trends": ("entities",),
+    "qloo_rank": ("options", "signals"),
+    "qloo_recommend": ("signals",),
+    "qloo_compare_audiences": ("group_a", "group_b"),
+}
+
+
+def _contains_tag_urn(value: Any) -> bool:
+    if isinstance(value, str):
+        return value.startswith("urn:tag:")
+    if isinstance(value, (list, tuple)):
+        return any(_contains_tag_urn(v) for v in value)
+    return False
 
 
 def compact_row(row: dict, depth: int = 0) -> dict:
@@ -45,25 +78,34 @@ class GroundedTools:
         client: QlooMcpClient,
         trace: Trace | None = None,
         model_call: Callable[[str, str, dict], Awaitable[None]] | None = None,
+        tool_names: tuple[str, ...] | None = None,
     ) -> None:
         self.client = client
         self.trace = trace
         self._model_call = model_call
+        self.tool_names = tool_names if tool_names is not None else DEFAULT_LLM_TOOLS
         self.evidence: list[dict] = []
         self.calls_made: list[tuple[str, dict]] = []
-        # (tool, args) pairs that came back needs_input with zero candidates —
-        # re-calling them cannot resolve the ambiguity (P2 live finding), so a
-        # repeat gets an honest DEAD_END envelope instead of a fresh Qloo call.
-        self._dead_ends: set[str] = set()
-
-    def _call_key(self, name: str, args: dict) -> str:
-        return f"{name}|{json.dumps(args, sort_keys=True, ensure_ascii=False)}"
+        # Tools that returned needs_input with ZERO candidates — re-calling
+        # them with any args cannot resolve the ambiguity (live 2026-10-22:
+        # the model produced three semantically identical dead-ends with
+        # different arg shapes and burned 4 of 6 steps). Ban per tool family
+        # for the rest of the run; exact-args matching was too narrow.
+        self._dead_end_tools: set[str] = set()
 
     def llm_specs(self) -> list[dict]:
+        names = [
+            name for name in sorted(self.client.tools)
+            if name != "qloo_capabilities"
+            and (self.tool_names is None or name in self.tool_names)
+        ]
+        if not names:
+            # Unknown/partial client (tests, future harness drift): expose
+            # whatever exists rather than starving the model of tools.
+            names = [n for n in sorted(self.client.tools)
+                     if n != "qloo_capabilities"]
         specs = []
-        for name in sorted(self.client.tools):
-            if name == "qloo_capabilities":
-                continue  # readiness is the harness's job, not the LLM's
+        for name in names:
             schema = self.client.tools[name]
             specs.append({
                 "type": "function",
@@ -80,37 +122,55 @@ class GroundedTools:
     async def dispatch(self, name: str, args: dict) -> dict:
         """Run a qloo_* tool; returns the compact model-facing dict."""
         operation = name.removeprefix("qloo_")
-        call_key = self._call_key(name, args)
         unknown = (
             self.client.tools
             and name not in self.client.tools
             and name != "qloo_capabilities"
         )
-        if call_key in self._dead_ends:
-            result = NormalizedResult(
-                status="error", operation=operation,
-                error_code="DEAD_END", retryable=False,
-                recovery=(
-                    "This exact call already returned needs_input with no "
-                    "candidates — re-calling it cannot help. Abstain from "
-                    "this thread (list it in honest_absences) and continue "
-                    "with other tools."
-                ),
-            )
-        elif unknown:
+        bad_arg = self._tag_urn_arg(name, args)
+        if unknown:
             result = NormalizedResult(
                 status="error", operation=operation,
                 error_code="NO_SUCH_TOOL", retryable=False,
                 recovery=f"{name} is not offered by the harness.",
             )
+        elif name in self._dead_end_tools:
+            result = NormalizedResult(
+                status="error", operation=operation,
+                error_code="DEAD_END", retryable=False,
+                recovery=(
+                    f"{name} already returned needs_input with no candidates "
+                    "in this run — it cannot help. Do NOT call it again. "
+                    "Abstain from that section, list it in honest_absences, "
+                    "and continue with other tools."
+                ),
+            )
+        elif bad_arg is not None:
+            result = NormalizedResult(
+                status="error", operation=operation,
+                error_code="TAG_IN_ENTITY_ARGS", retryable=False,
+                recovery=(
+                    f"{name} takes real entity ids or names in "
+                    f"{bad_arg!r}, not tag URNs. Tag URNs belong only in "
+                    "signal_tags/include_tags/exclude_tags on "
+                    "qloo_recommend/qloo_rank. Resolve a concrete entity via "
+                    "qloo_find_tags/qloo_recommend first."
+                ),
+            )
         else:
             result = await self.client.call_tool(operation, args)
             if result.status == "needs_input" and not result.candidates:
-                self._dead_ends.add(call_key)
+                self._dead_end_tools.add(name)
         self._trace_call(name, args, result)
         self.calls_made.append((name, args))
         self.evidence.append(self._evidence(result))
         return self.model_result(result)
+
+    def _tag_urn_arg(self, name: str, args: dict) -> str | None:
+        for arg_name in _ENTITY_ONLY_ARGS.get(name, ()):
+            if _contains_tag_urn(args.get(arg_name)):
+                return arg_name
+        return None
 
     async def safe_dispatch(self, name: str, args: dict) -> dict:
         try:

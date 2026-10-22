@@ -26,6 +26,13 @@ from app.qloo.redact import redact, register_secret
 
 log = logging.getLogger("tastewell.qloo.mcp")
 
+# Envelope error codes that are worth one bounded retry even when the harness
+# marks them non-retryable (live 2026-10-22: a transient QLOO_DNS killed the
+# last tool call of a grounded run mid-flight).
+_TRANSIENT_ERROR_CODES = frozenset({
+    "QLOO_DNS", "QLOO_TIMEOUT", "QLOO_NETWORK", "QLOO_TRANSPORT",
+})
+
 
 def resolve_qloo_bin(qloo_bin: str) -> str:
     if "/" in qloo_bin or os.sep in qloo_bin:
@@ -218,7 +225,8 @@ class QlooMcpClient:
         result = await self.call_once(operation, payload)
         while (
             result.status == "error"
-            and result.retryable
+            and (result.retryable
+                 or result.error_code in _TRANSIENT_ERROR_CODES)
             and attempt < self.max_retries
         ):
             attempt += 1

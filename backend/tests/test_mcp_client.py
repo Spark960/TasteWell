@@ -158,3 +158,20 @@ async def test_transport_failure_retryable():
         res = await c.call_tool("find_tags", {"query": "jazz"})
     assert res.status == "ok"
     assert len(session.calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_dns_error_retried_despite_nonretryable_flag():
+    """QLOO_DNS is transient (live 2026-10-22 killed a grounded run's last
+    tool call); retry it even when the envelope says retryable=false."""
+    env = {
+        "error": {"code": "QLOO_DNS", "layer": "network",
+                  "retryable": False, "recovery": "retry"},
+        "operation": "find_tags",
+    }
+    session = FakeSession([env, dict(OK_FIND_TAGS)])
+    async with client_with(session, max_retries=1,
+                           sleep=lambda s: None) as c:
+        res = await c.call_tool("find_tags", {"query": "jazz"})
+    assert res.status == "ok"
+    assert len(session.calls) == 2

@@ -199,3 +199,71 @@ async def test_needs_input_zero_candidates_repeat_is_dead_end():
         if ev.get("type") == "tool_result" and ev.get("error_code") == "DEAD_END"
     ]
     assert dead and dead[0]["status"] == "error"
+
+@pytest.mark.asyncio
+async def test_zero_candidate_needs_input_bans_tool_for_whole_run():
+    """Any args for a tool that dead-ended once must short-circuit — the live
+    failure used three different arg shapes for the same zero-candidate
+    needs_input (exact-match guard was too narrow)."""
+    provider = FakeProvider([
+        Reply(tool_calls=[{"id": "t1", "name": "qloo_audience_demographics",
+                           "args": {"entity": "millennials", "limit": 5}}]),
+        Reply(tool_calls=[{"id": "t2", "name": "qloo_audience_demographics",
+                           "args": {"entity": "gen z", "limit": 5}}]),
+        Reply(content=json.dumps(FINAL_BRIEF)),
+    ])
+    ni = NormalizedResult(
+        status="needs_input", operation="audience_demographics",
+        result_count=0, candidates=[],
+        summary="Choose the intended Qloo entity.",
+    )
+    client = FakeClient([ni])
+    client.tools["qloo_audience_demographics"] = {"type": "object"}
+    runner, tools = grounded_runner(provider, client, max_steps=6)
+    outcome = await runner.run(BriefRequest("natural wine bar"))
+    assert outcome.status == "ok"
+    assert len(client.ops) == 1
+    dead = [
+        ev for ev in tools.trace.events
+        if ev.get("type") == "tool_result" and ev.get("error_code") == "DEAD_END"
+    ]
+    assert dead
+
+
+@pytest.mark.asyncio
+async def test_tag_urn_in_entity_args_rejected_without_qloo_call():
+    """urn:tag:* ids must never reach entity-only args (live-verified to
+    always return zero-candidate needs_input and loop the model)."""
+    provider = FakeProvider([
+        Reply(tool_calls=[{"id": "t1", "name": "qloo_entity_tags",
+                           "args": {"entities": [JAZZ_ID]}}]),
+        Reply(content=json.dumps(FINAL_BRIEF)),
+    ])
+    client = FakeClient([])
+    client.tools["qloo_entity_tags"] = {"type": "object"}
+    runner, tools = grounded_runner(provider, client, max_steps=4)
+    outcome = await runner.run(BriefRequest("x"))
+    assert outcome.status == "ok"
+    assert client.ops == []
+    tool_msg = [
+        m for m in provider.seen[1][0] if m["role"] == "tool"
+    ][0]
+    body = json.loads(tool_msg["content"])
+    assert body["status"] == "error"
+    assert body["error"]["code"] == "TAG_IN_ENTITY_ARGS"
+
+
+def test_llm_specs_default_trimmed_to_budget_tools():
+    client = FakeClient([])
+    for name in (
+        "qloo_find_tags", "qloo_describe", "qloo_recommend",
+        "qloo_where_popular", "qloo_rank", "qloo_entity_tags",
+        "qloo_audience_demographics", "qloo_compare_audiences",
+        "qloo_trends", "qloo_capabilities",
+    ):
+        client.tools[name] = {"type": "object"}
+    names = [s["function"]["name"] for s in GroundedTools(client=client).llm_specs()]
+    assert names == sorted([
+        "qloo_find_tags", "qloo_describe",
+        "qloo_recommend", "qloo_where_popular",
+    ])
