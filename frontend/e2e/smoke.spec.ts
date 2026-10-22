@@ -140,7 +140,7 @@ test.describe("tastewell smoke (mocked backend)", () => {
   test("preset click → both panes render; trace shows tool rows", async ({ page }) => {
     await page.goto("/");
     await page
-      .getByRole("button", { name: "Natural wine bar · millennials · Brooklyn" })
+      .getByRole("button", { name: "Wine bar" })
       .click();
     // To exercise the ok path without the picker branch, the first grounded
     // stream would serve needs_input — so this spec picks it immediately and
@@ -167,7 +167,7 @@ test.describe("tastewell smoke (mocked backend)", () => {
   test("needs_input → picker → pick re-drives grounded pane to done", async ({ page }) => {
     await page.goto("/");
     await page
-      .getByRole("button", { name: "Listening bar · young professionals · Williamsburg" })
+      .getByRole("button", { name: "Listening bar" })
       .click();
     await page.getByRole("button", { name: "Run both panes" }).click();
 
@@ -188,7 +188,7 @@ test.describe("tastewell smoke (mocked backend)", () => {
   test("trace panel lists tool rows with status chips", async ({ page }) => {
     await page.goto("/");
     await page
-      .getByRole("button", { name: "Taco shop · families · Texas" })
+      .getByRole("button", { name: "Tacos" })
       .click();
     await page.getByRole("button", { name: "Run both panes" }).click();
 

@@ -98,6 +98,15 @@ Raw outputs: `probe/out/<operation>.<variant>.json`.
   ("millennials"), filter_location?, include_tags?/exclude_tags? + operators,
   explain?: bool, limit?}`. `target_type` ∈ artist, book, brand, movie,
   person, place, podcast, tv_show, videogame (aliases accepted).
+- **Demographic free-text resolution (live-verified 2026-10-22, jazz
+  signal_tag + limit 5 + signal_location set):** works for
+  `millennials`, `young professionals`, `gen z`, `young women`,
+  `men 25-34`, `young families`. Returns `needs_input` (demographic-word
+  unresolved; harness does NOT offer demographic candidates → these are
+  zero-candidate dead-ends in the agent, sections get omitted) for
+  `families`, `parents`, `college students`, `couples`, `tourists`.
+  Resolution is word-driven, independent of signal_location (verified at
+  two locations). Presets must only use the safe list.
 - live call: `{"target_type":"artist","signal_tags":["urn:tag:genre:music:jazz"],
   "signal_location":"Brooklyn, New York","demographic":"millennials","limit":5}`
   → ok, count 5, per result: `{entity_id, name, type:"urn:entity",

@@ -11,22 +11,58 @@ export type Preset = {
 
 const PRESETS: Preset[] = [
   {
-    label: "Natural wine bar · millennials · Brooklyn",
+    label: "Wine bar",
     brief: "natural wine bar",
     region: "Brooklyn",
     audience: "millennials",
   },
   {
-    label: "Taco shop · families · Texas",
+    label: "Tacos",
     brief: "taco shop",
-    region: "Texas",
-    audience: "families",
+    region: "Austin, Texas",
+    audience: "young families",
   },
   {
-    label: "Listening bar · young professionals · Williamsburg",
+    label: "Listening bar",
     brief: "listening bar",
     region: "Williamsburg",
     audience: "young professionals",
+  },
+  {
+    label: "Coffee",
+    brief: "specialty coffee shop",
+    region: "Silver Lake, Los Angeles",
+    audience: "gen z",
+  },
+  {
+    label: "Izakaya",
+    brief: "izakaya",
+    region: "East Village, Manhattan",
+    audience: "young professionals",
+  },
+  {
+    label: "Jazz club",
+    brief: "jazz club",
+    region: "Harlem, Manhattan",
+    audience: "young women",
+  },
+  {
+    label: "Craft beer",
+    brief: "craft beer hall",
+    region: "Denver, Colorado",
+    audience: "men 25-34",
+  },
+  {
+    label: "Bubble tea",
+    brief: "bubble tea shop",
+    region: "Monterey Park, California",
+    audience: "gen z",
+  },
+  {
+    label: "Record store",
+    brief: "vinyl record store",
+    region: "Bushwick, New York",
+    audience: "gen z",
   },
 ];
 
@@ -54,7 +90,8 @@ export function BriefForm({
       }}
     >
       <div>
-        <div className="mb-1.5 flex flex-wrap gap-1.5">
+        <p className="mb-1.5 text-xs font-medium text-zinc-400">Fast presets</p>
+        <div className="mb-1.5 flex flex-wrap gap-1.5" role="group" aria-label="Fast presets">
           {PRESETS.map((p) => (
             <button
               key={p.label}

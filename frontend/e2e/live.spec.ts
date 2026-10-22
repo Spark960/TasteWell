@@ -10,7 +10,7 @@ test("live local demo: preset → needs_input → pick → grounded ok brief", a
   await page.goto("/");
 
   await page
-    .getByRole("button", { name: "Listening bar · young professionals · Williamsburg" })
+    .getByRole("button", { name: "Listening bar" })
     .click();
   await page.getByRole("button", { name: "Run both panes" }).click();
 
