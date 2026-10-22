@@ -32,6 +32,7 @@ probe/inputs/
 # traces/logs (may contain request payloads)
 *.trace.json
 trace.json
+dev.log
 logs/
 
 # os / editor
