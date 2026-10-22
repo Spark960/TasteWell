@@ -1,10 +1,10 @@
-# HANDOFF - for a fresh session (2026-10-21 evening)
+# HANDOFF - fresh session (2026-10-22 midday, session ended leaving)
 
-> Start with `IMPLEMENTATION.md` (source of truth: decisions log, phases,
-> runbook  6, operating notes  10). This file is the session bridge: current
-> state + what changed in the last working session + exactly what to do next.
-> **Session-end state: ALL servers deliberately killed (see  7). Uncommitted
-> work in BOTH frontend and backend - commit it as your first action.**
+> Start with this file. `IMPLEMENTATION.md` remains the deep source of truth
+> (decisions log, phases, runbook 6, operating notes 10). This bridge captures
+> the 2026-10-22 midday session state + exactly what to do next.
+> **Servers: all KILLED (no changes this session). Tree: clean as of the
+> final commit except nothing pending.**
 
 ## 0. Where we are
 
@@ -14,159 +14,151 @@
 | P1 adapter layer | done |
 | P2 MCP agent loop + CLI | done |
 | P3 FastAPI + SSE HTTP layer | done |
-| **P4 Next.js UI** | **code complete** (this evening's UX fixes below, uncommitted) |
-| P5 deploy (EC2/Docker/Caddy/DuckDNS) | next - `deploy/` dir doesn't exist yet |
-| P6 submission package | deadline Oct 29 (internal), hard Oct 30 11:45pm EDT |
+| P4 Next.js UI | committed (`d29d12b`, `384b408`); hardening committed (`c05305b`, this session) |
+| **P4.1 preset expansion** | **IN PROGRESS - this session's active task (see section 2)** |
+| P5 deploy | next - `deploy/` still does not exist |
+| P6 submission | deadline Oct 29 internal, hard Oct 30 11:45pm EDT |
 
-Repo: local git only; commits exist for P0..P3. P4 work and everything below
-is still uncommitted. **First action next session: commit.**
+## 1. What happened this session (2026-10-22 midday)
 
-## 1. What Tastewell is (1-para refresher)
+1. **Committed all pending backend hardening as `c05305b`** (the previous
+   handoff flagged it as uncommitted): zero-candidate dead-end now bans the
+   tool FAMILY for the whole run; `urn:tag:*` URNs are rejected before they
+   reach entity-only args (probe-verified they always return zero-candidate
+   needs_input and loop the model); `qloo_capabilities` + 5 unused tools
+   trimmed from LLM specs into `DEFAULT_LLM_TOOLS` (token budget: Groq 8k
+   TPM); transient QLOO_DNS/QLOO_TIMEOUT/QLOO_NETWORK retried even when
+   envelope says retryable=false. +4 tests. **63 mocked tests green**
+   (`py -3.12 -m pytest -q` in backend: 63 passed, 1 skipped live).
+2. **Verified the live run this morning performed as designed** (user-pasted
+   trace): grounded run 05:46:44 -> 05:47:43 = ~59s, 23 trace events, 3 Qloo
+   envelopes, exit=ok; ungrounded pane still intentionally fake + honest
+   disclaimer. The hardening is working; no further loop fixes needed.
+3. **Preset expansion started** (user complaint: "very limited selection,
+   only 3 options" -> the 3 chips in `BriefForm.tsx`). Quota-safe tag probing
+   done (direct `qloo exec` harness calls, no LLM steps). Implementation NOT
+   started - that is exactly where the session stopped.
 
-B2B venue/hospitality concept agent for the Qloo agentic hackathon. Operator
-gives concept + area + audience -> agent resolves real taste anchors via Qloo
-MCP tools (only route allowed by hackathon rules) -> grounded concept brief
-(menu tilt, music programming, adjacent brands, tag themes) with per-claim
-citations and a 6-status honest envelope (abstain, never invent). The UI runs
-the SAME brief twice - grounded vs Qloo-off - side by side, so judges see the
-differentiator in one click. Aggregate framing only, disambiguation picker is
-a headline feature (Qloo's "five Jazzes" problem made a feature).
+## 2. ACTIVE TASK: presets 3 -> 9 (verified data - do not re-probe)
 
-## 2. Frontend - `frontend/` (all this evening's additions uncommitted)
+### Verified via `qloo exec find_tags` (semantic, all `[ok]`, 10 results each)
+Specialty coffee | Jazz club | Ramen | Barbecue | Craft beer | Izakaya |
+Vegan | Bubble tea | Speakeasy | Record store | Hot pot | Baked goods.
+=> Any of these can be a preset venue concept.
 
-- Next 16.4.2 (App Router, TS, Tailwind 4, npm) + mocked-Playwright smoke.
-- Files (evening's UX-fix batch):
-  - `lib/api.ts` streamRun - **ends SSE consumption right at `run_done`**
-    (reader.cancel + return) so a run flips to done/needs_input instantly
-    instead of lingering "running until the server closes".
-  - `app/components/TracePanel.tsx` - auto-opens once ANY events exist
-    (manual toggle overrides via userOpen); every row tagged with pane pill
-    `Q+` (grounded) / `noQ` (ungrounded) + legend, so a `run_done` row can't
-    be misread as the other pane finishing; compact `LiveTrace` component
-    (auto-scrolling, last 14 rows) exported.
-  - `app/components/ResultPane.tsx` - takes `events` prop, renders LiveTrace
-    INSIDE the pane while starting/running (skeleton only pre-events).
-  - `app/TastewellApp.tsx` - main column order now Grounded result ->
-    Live trace panel -> Ungrounded box; grid rows `1.5fr / 0.8fr / 0.8fr`.
-  - `e2e/smoke.spec.ts` - trace-panel test skips the toggle click when the
-    panel is already auto-open.
-- Run commands unchanged: `npm run dev` :3000 / `npm run build` / `npm run
-  lint` / `npm run e2e:smoke` (lint+build+3 smoke tests verified green).
+### Verified via `qloo exec recommend` (signal_tags=[urn:tag:genre:music:jazz], limit 5)
+DEMOS THAT ARE SAFE (ok, 5 rows):
+- `gen z` @ `Silver Lake, Los Angeles` (first: Dam-Funk)
+- `young families` @ `Austin, Texas` (first: NoName)
+- `young women` @ `Harlem, Manhattan` (first: H.E.R.)
+- `men 25-34` @ `Denver, Colorado` (first: Vulfpeck)
 
-## 3. Backend (all tonight's edits uncommitted; 58 mocked tests pass)
+DEMOS THAT DEAD-END (needs_input, implementation must NOT use):
+`families` | `parents` | `college students` | `couples` | `tourists`.
+(Verified independent of location: families failed @ Queens AND @ Austin.)
+**The existing taco preset's audience `families` is UNSAFE - it must become
+`young families`.**
 
-- `app/agent/loop.py` - logs `llm_started` (step, mode, tools) BEFORE
-  provider.chat so the trace shows movement during slow LLM waits.
-- `app/agent/provider.py`:
-  - `_MAX_429_RETRIES=3`, `_MAX_429_WAIT=240` (waits capped at 240s, sized
-    for minute-scale rolling quota windows; never one step = whole deadline).
-  - `max_tokens` default 16384 -> 4096; `reasoning_effort="low"` for
-    gpt-oss* models only (cuts completion tokens 192 -> 64 on step 1 and
-    wall-clock latency).
-- `app/api/engine.py` - summary() now reports terminal `exit_status`
-  ("done"/"error") when the outcome is absent after a crash/timeout kill;
-  pollers no longer see a dead run as "running" forever.
-- `tests/test_provider.py` - 429-budget test updated (initial + 3 retries).
-- `backend/serve.ps1` (NEW) - THE restart script (see  5/ 7): kills the
-  existing :8000 listener first, parses repo .env into the same
-  shell, launches uvicorn hidden, asserts the fresh log reports a
-  successful bind. **Pure-ASCII constraint: PS 5.1 misdecodes non-ASCII
-  (em-dash) in .ps1 and executes garbage - keep this file ASCII-only.**
+### Planned final catalog (place into `frontend/app/components/BriefForm.tsx` PRESETS)
+1. Natural wine bar / millennials / Brooklyn, New York      [all verified]
+2. Taco shop / young families / Austin, Texas               [verified today]
+3. Listening bar / young professionals / Williamsburg       [live-verified]
+4. Specialty coffee / gen z / Silver Lake, Los Angeles      [verified today]
+5. Izakaya / young professionals / East Village, Manhattan  [audience verified LIVE (Williamsburg); exact location pair NOT probed]
+6. Jazz club / young women / Harlem, Manhattan              [verified today]
+7. Craft beer / men 25-34 / Denver, Colorado                [verified today]
+8. Bubble tea / gen z / Monterey Park, California           [pair NOT probed]
+9. Record store / gen z / Bushwick, New York                [pair NOT probed]
 
-## 4. ROOT CAUSE of the slow runs (fully diagnosed with probes - trust this)
+### Remaining steps, in order
+1. ONE probe round for the 3 unproven pairs (2s spacing, ~1 min):
+   recommend(signal_tags=[urn:tag:genre:music:jazz], target_type=artist,
+   limit=5) for: gen z + `Monterey Park, California`; gen z + `Bushwick, New York`;
+   young professionals + `East Village, Manhattan`. Swap in probed-safe
+   locations (Silver Lake / Denver / Harlem / Williamsburg) for any that
+   needs_input. Reusable probe scripts: `%TEMP%\opencode\preset_demo_probe.ps1`
+   and `preset_demo_probe2.ps1` (edit the `Probe` list; keep ASCII-only).
+2. Edit `BriefForm.tsx` PRESETS with the catalog above. UI change: chips
+   should use SHORT venue-only labels ("Wine bar", "Tacos", "Listening bar",
+   "Coffee", "Izakaya", "Jazz club", "Craft beer", "Bubble tea", "Record
+   store") - full combined labels wrap badly in the 300px sidebar (one chip
+   ~= one row); the full combination is visible in the three inputs after
+   click. Keep the existing chip style/classes.
+3. `npm run lint`, `npm run build`, `npm run e2e:smoke` in `frontend/`
+   (react-compiler lint rules apply - see quirks). Playwright smoke mocks
+   `**/api/agent/runs/**`; preset count changes should not touch tests, but
+   verify.
+4. Persist today's demographic findings into `docs/qloo-contract.md`
+   (safe/unsafe free-text demographic list; note the demographic-word
+   needs_input failure mode and zero-candidate needs_input = dead-end).
+   Also note `young families`,
+   `men 25-34`, `young women`, `gen z` verified live 2026-10-22.
+5. Then ONE live browser run of 2-3 new presets via `backend\serve.ps1` +
+   `npm run dev` (each grounded double-run costs ~11k TPD of ~200k; budget
+   is fine). Confirm every section populated, no dead-end omissions.
 
-Layered: provider quota + a silent-restart trap.
+## 3. State of the two sides (unchanged this session)
 
-1. **Provider capacity, measured:**
-   - Groq free tier on this key family: `gpt-oss-120b` = **8k tokens/min
-     (TPM) and a rolling ~200k tokens/day (TPD)**. The original account hit
-     `Used 197659 / Limit 200000` -> EVERY grounded call 429'd with
-     retry-after ~207s; 3 retries x <=240s can span past the 600s run wall
-     so runs froze ~10 min then died at the deadline. Generic runs are
-     prompt-only (~1-2k tokens) and always squeaked through in 2-6s.
-   - One grounded step = ~2.8k input tokens (system 510 + user + LIVE tool
-     specs 2550 chars; tool-spec payload measured directly from the MCP
-     harness). Same request OUTSIDE the app returned 200 in 1.0-1.3s with
-     tool_calls on the fresh key - the LLM endpoint itself is healthy.
-   - `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `llama-4-scout` all
-     **404 (not available on this key)**; `gemini-3.8-flash` = 429 (RPD
-     drained; resets ~07:30 UTC); `OPENAI_API_KEY` exists but EMPTY.
-   - User swapped to a NEW Groq account late in the session (fresh TPD).
-   - Probe scripts live in `%TEMP%\opencode\`: `model_limits.py`,
-     `probe_tools.py` (exact grounded step-1 request), `live_drive.py`
-     (full double-run with polling), `groq_probe.py`. Rerun with
-     `py -3.12 -u` (unbuffered!) - see quirk below.
-2. **The silent-restart trap (the real wolf):** plain `Start-Process`
-   "restarts" that skip killing the :8000 listener FAIL with
-   Errno 10048 (bind) - but health keeps 200 because the OLD process keeps
-   serving. That night, two "restarts" no-oped silently, so a live drive and
-   parts of the probe session ran against a backend on the OLD drained key
-   with workflow/code older than assumed. Evidence: `[Errno 10048]` line in
-   `uvicorn.err.log`. **Rule from now on: restart ONLY via
-   `backend\serve.ps1`** (kills first, asserts bind in the log). Also: the
-   checked message may print "(launcher pid != owner pid)" EXPECTEDLY -
-   py.exe (launcher) vs python3.12.exe (child owns the port).
-3. Not-a-cause (verified): client SSE handling, pane wiring, 600s wall -
-   those behave; the 206s/600s stalls were 429 wait-chains on a drained key.
+- Frontend `frontend/`: Next 16.4.2 App Router, TS, Tailwind 4. Key files:
+  `app/TastewellApp.tsx` (two-pane driver + re-drive on pick),
+  `app/components/BriefForm.tsx` (PRESETS - the file being edited),
+  `components/ResultPane.tsx`, `components/TracePanel.tsx`, `lib/api.ts`
+  (SSE stream ends at `run_done`).
+- Backend `backend/`: FastAPI :8000 + SQLite run registry + agent loop;
+  restart ONLY via `backend\serve.ps1` (kills :8000 first, asserts bind).
+  Provider: `LLM_PROVIDER=groq`, `LLM_MODEL=openai/gpt-oss-120b`.
 
-## 5. Quirks/lessons (don't relearn these)
+## 4. Known root cause of old slow runs (condensed)
 
-- **PS 5.1 + UTF-8 = footgun.** Same as before, now with two new heads:
-  (a) non-ASCII chars (em-dash) in a .ps1 get misdecoded and the line is
-  EXECUTED as garbage (happened in serve.ps1 - keep scripts ASCII-only);
-  (b) writing source files must go through editor tools, never PS cmdlets.
-- **`py -3.12 script.py` buffers stdout when no TTY** - a long polling loop
-  prints NOTHING to the captured shell until exit. Always `py -3.12 -u`.
-- **py.exe launcher pid != actual python pid** (child process owns the
-  port). Never compare port-owner vs launcher pid; assert via log content.
-- **Playwright wire mocks:** glob `*` does NOT cross `/` - `**/api/agent/run*`
-  matches POST run but never `/api/agent/runs/<id>`; register
-  `**/api/agent/runs/**` separately. Strict mode breaks `.or(...)` - use
-  `expect(cb).toPass()` polling.
-- **React-compiler lint rules**: no setState in effect body, no ref reads /
-  Date.now() during render. Clocks: parent captures `Date.now()` in the
-  handler -> prop -> child ticks via `setInterval` setState.
-- Backend process env: Start-Process inherits the current shell - env
-  parsing + Start-Process MUST be in the same bash call (now packed into
-  `backend\serve.ps1`).
-- Trapped earlier, still true: `_proc.Started` etc. irrelevant; uvicorn MUST
-  have stderr redirected or diagnostics like 10048 vanish forever.
+Groq free tier = 8k TPM rolling + ~200k TPD; a drilled TPD 429-chains past
+the 600s wall. Plus a silent-restart trap (plain Start-Process cannot bind
+:8000 while the old process lives, health still answers 200 -> stale app).
+Both are handled now (fresh key account + reasoning_effort=low + serve.ps1).
+Full detail: IMPLEMENTATION.md runbook.
 
-## 6. Next steps, in order
+## 5. Quirks/lessons (still true - do not relearn)
 
-0. **Commit everything** (frontend + backend, likely 2 commits) - the tree
-   is green-verified where tested: backend 58 mocked pass; frontend
-   lint/build/3-smoke pass. Live end-to-end re-verify is step 2.
-1. **One verified live end-to-end drive** (quota budget is fresh today):
-   `powershell -ExecutionPolicy Bypass -File backend\serve.ps1` ->
-   expect `Uvicorn running` in `%TEMP%\opencode\uvicorn.err.log` ->
-   `py -3.12 -u %TEMP%\opencode\live_drive.py` -> expect grounded DONE in
-   well under 2 min now (fresh key + reasoning_effort=low + fast probe).
-   Then browser: `npm run dev` in frontend and run a preset, hard-refresh
-   first. If grounded still stalls >60s at llm_started, rerun
-   `probe_tools.py` to recheck quota/latency.
-2. P5 deploy when UI is verified: `deploy/` per previous plan (Dockerfiles,
-   compose, Caddyfile, smoke_test.sh, bootstrap.sh; AWS t3.micro  6.1 /
-   plan B Fly.io  6.4 in IMPLEMENTATION.md).
-3. Lighthouse a11y >=95 check (still open).
-4. P6 package: MIT LICENSE, README per kit SUBMISSION.md, public repo,
+- **PS 5.1 + UTF-8 = footgun.** Non-ASCII (em-dash) in a .ps1 gets
+  misdecoded and EXECUTED as garbage - keep .ps1 ASCII-only. Write source
+  files via editor tools, never PS cmdlets.
+- **`py -3.12 script.py` buffers stdout without a TTY** - always `py -3.12 -u`.
+- **py.exe launcher pid != owner pid** - assert restarts via uvicorn log
+  content, never pids.
+- **Playwright mocks:** glob `*` does not cross `/` - register
+  `**/api/agent/run/**` AND `**/api/agent/runs/**` separately.
+- **React-compiler lint:** no setState in effect body, no ref/Date.now()
+  reads during render; clocks must be parent-handler -> prop -> interval.
+- **PS 5.1 npm shims mangle inline --input JSON** - always `--input-file`.
+- Quota hygiene: sequential, 2s spacing; never loop probes.
+- Live demographic probes (recommend) DID behave independently of location:
+  demographic WORD is what failed, so verified words are portable.
+
+## 6. Next steps after P4.1 (unchanged plan)
+
+1. P5 deploy: `deploy/` (Dockerfiles, compose, Caddyfile, smoke_test.sh,
+   bootstrap.sh) - AWS t3.micro, plan B Fly.io (IMPLEMENTATION.md 6.x).
+2. Lighthouse a11y >= 95 check (open).
+3. P6 package: MIT LICENSE, README per kit SUBMISSION.md, public repo,
    Devpost by Oct 29.
+4. Optional demo polish ideas surfaced but NOT implemented: URL params for
+   shareable preset links (init state from useSearchParams, Suspense
+   boundary needed), a shuffle/"surprise" button over the catalog, a
+   grounded-vs-generic verdict strip. Do not let these block P5/P6.
 
 ## 7. Working session env (end state)
 
-- **All servers KILLED deliberately at session end** (:8000 python and
-  :3000 node, verified ports clear; no uvicorn strays).
-- Frontend: bring up with `npm run dev` in `frontend/` (log to dev.log if
-  hidden).
-- Backend: bring up ONLY with
-  `powershell -ExecutionPolicy Bypass -File backend\serve.ps1` (from repo
-  root), then verify: `Invoke-WebRequest http://localhost:8000/api/health`
-  and tail `%TEMP%\opencode\uvicorn.err.log` for `Uvicorn running`.
-- Provider: `LLM_PROVIDER=groq` + `LLM_MODEL=openai/gpt-oss-120b` (svc env
-  in `backend\serve.ps1`); Groq key = new account as of this evening.
-  Remember gemini resets ~07:30 UTC if you need a fallback (small
-  `gemini-3.8-flash` RPD).
-- Playwright browsers installed (chromium 1248).
-- Live smoke = `GET /api/health`, `GET /api/qloo/status` (zero data cost),
-  then the preset click in the browser or `live_drive.py` for the full
-  double-run.
+- **Servers KILLED at session end.** Backend up: from repo root
+  `powershell -ExecutionPolicy Bypass -File backend\serve.ps1`, then
+  `Invoke-WebRequest http://localhost:8000/api/health` + tail
+  `%TEMP%\opencode\uvicorn.err.log` for `Uvicorn running`. Frontend up:
+  `npm run dev` in `frontend/`.
+- Full live smoke: GET /api/health, GET /api/qloo/status (zero cost), then
+  `py -3.12 -u %TEMP%\opencode\live_drive.py` or the browser preset click.
+- Probe scratch: `%TEMP%\opencode\preset_tag_probe.ps1` (12 find_tags),
+  `preset_demo_probe.ps1`, `preset_demo_probe2.ps1`; last full envelope at
+  `%TEMP%\opencode\presets_probe\in.json` + `students_full.json`
+  (college-students needs_input shape).
+- Provider: new-account Groq key (TPD fresh-ish; ~1 live double-run burned
+  ~11-15k this morning + ~33 direct harness probes, no LLM steps - quota is
+  safe). `gemini-3.8-flash` fallback resets ~07:30 UTC.
+- Playwright chromium installed (1248).
