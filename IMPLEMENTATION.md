@@ -9,7 +9,8 @@
 
 ## 0. Snapshot — resume here first
 
-> If you are returning to this project after a break, read this section, then
+> If you are returning to this project after a break, read **`HANDOFF.md`**
+> first, then this section, then
 > find the **lowest-numbered phase whose checklist is not fully checked** and
 > run its "Resume context → next command".
 
@@ -19,7 +20,7 @@
 | P1 | Integration layer: Python wrapper around `qloo exec` + status normalizer | ✅ done 2026-10-21 | mock tests green (22) + live adapter call ok |
 | P2 | Agent loop: FastAPI ↔ `qloo mcp` stdio, tools, grounding contract, abstain policy, CLI test runner | ✅ done 2026-10-21 | one brief → full concept via CLI |
 | P3 | HTTP layer: FastAPI endpoints + SSE trace + Qloo-off toggle | ✅ done 2026-10-21 | curl-able end to end |
-| P4 | Next.js UI: brief form, side-by-side, trace panel, disambiguation picker | ☐ | demoable locally |
+| P4 | Next.js UI: brief form, side-by-side, trace panel, disambiguation picker | ☒ code complete 2026-10-21 | Lighthouse a11y still open |
 | P5 | Deploy: EC2 t3.micro + Docker Compose + Caddy + DuckDNS TLS | ☐ | public URL, HTTPS, external smoke test |
 | P6 | Submission package: README, LICENSE, Devpost description, presets | ☐ | **submit by Oct 29** |
 | P7 | Buffer | ☐ | hard deadline Oct 30 11:45pm EDT |
@@ -333,14 +334,19 @@ Tasks:
 7. Next.js module layout Test: Playwright smoke — preset click on the first preset trace (grounded + ungrounded panes render; trace has ≥1 tool_result; `empty` state renders).
 
 Verify checklist:
-- [ ] `pnpm build` green; `pnpm e2e:smoke` green locally
-- [ ] Lighthouse a11y ≥ 95 + no key in client bundle (grep `NEXT_PUBLIC` for forbidden)
-- [ ] Full local demo works: `docker compose up` or dev servers: FastAPI :8000 + Next dev :3000
+- [x] `pnpm build` green (`npm run build` — Next 16.4.2 + Turbopack; `npm run e2e:smoke` green: 3 Playwright tests, mocked-backend, 6s)
+- [ ] Lighthouse a11y ≥ 95 + no key in client bundle (key half done: grep clean — only `NEXT_PUBLIC_API_BASE` exists, no `NEXT_PUBLIC_QLOO*`; Lighthouse still to run)
+- [x] Full local demo works: dev servers FastAPI :8000 + Next dev :3000 — live-driven via Playwright (2026-10-21): Qloo-ready badge live, real needs_input picker (5 real Qloo place candidates + popularity), honest absences, generic pane degrades, trace 12 events, disclaimer footer all real
 
 Resume context:
-- Done: —
-- In flight: —
-- Next command: `cd frontend && pnpm dev`
+- Done (2026-10-21): `frontend/` Next 16 (App Router, TS, Tailwind 4, npm not pnpm — user key error tolerated). Files: `lib/api.ts` (typed client + SSE line parser, API_BASE via `NEXT_PUBLIC_API_BASE`, `.env.local` = localhost:8000); `app/TastewellApp.tsx` (orchestrator: drives grounded+generic concurrently on one brief, per-pane AbortController + Stop button, pick re-drive via `pick` payload); `app/components/BriefForm.tsx` (3 preset chips: natural-wine-bar/taco-shop/listening-bar; one-click first demo); `ResultPane.tsx` (sections with `(id:…)` citations stripped → provenance chips tooltip = envelope tool+status+summary; honest-absences block; generic "model's guess" note; needs_input picker); `TracePanel.tsx` (collapsible, merged chronological events, all/generic/grounded/tools filters, status chips color-coded); `StatusChip.tsx`; `e2e/smoke.spec.ts` (mocked-backend Playwright: run/stream/runs routes fulfilled with fixture SSE; 3 tests incl. needs_input→pick→ok re-drive); `e2e/live.spec.ts` (opt-in `E2E_LIVE=1` real-backend drive, 300s timeout).
+- Mixed UX finding: each pane needs its own needs_input state because the backend's cache makes the grounded pane re-hit the ambiguous lookup while the generic pane finishes; the picker per pane (not shared modal) avoids confusion.
+- Learned (this session): (1) PS 5.1 `Set-Content -Encoding utf8` writes UTF-8 **with BOM** → broke package.json / next dev; strip BOM via `[IO.File]::WriteAllText($p, $text, UTF8Encoding($false))`; prefer Write-like tools or BOM-free writes for JSON. (2) Playwright glob `*` does NOT cross `/`: `**/api/agent/run*` matches POST run but NOT `/api/agent/runs/<id>` — register `**/api/agent/runs/**` as its own route (last-registered wins, so order: run, runs, stream). (3) Strict-mode `.or(loc).or(loc)` assertions FAIL once >1 branch matches — use `expect(cb).toPass()` poll instead. (4) Headed uvicorn must be restarted in the SAME bash call as `.env` parse + `LLM_PROVIDER=groq` (process env overrides pydantic .env default gemini). (5) `create-next-app` latest asks extra flags (react-compiler/cache-components) — pass explicit flags non-interactively.
+- In flight: none — P4 code complete (live second drive hit >280s agent latency once; run 1 proved all state paths live).
+- P4 polish pass (same day): (1) repaired mojibake (`â€"`) in TastewellApp.tsx — root cause was the PS 5.1 `Get-Content -Raw | Set-Content` round-trip re-decoding UTF-8-no-BOM files as ANSI (same class of bug as the §10 BOM lesson: NEVER round-trip UTF-8 files through PS 5.1 text cmdlets; use editor tools). (2) De-slopped UI per user: Qloo ready badge removed (no `fetchQlooStatus` on page load), slog copy trimmed, candidate rows now "Name · type · NN% match" (raw `urn:entity:place` collapsed to last type segment), abstain list hidden while the needs_input picker is showing (heading now "No grounded result", body "Left blank rather than guessed: …"), running pulse dot removed. (3) Backend `_GENERIC_SHAPE` tightened: generic mode must fill every section with guesses and return empty honest_absences (user's test run showed the generic pane abstaining on everything — that was prompt quirk, not Qloo). Grounded-side behavior user saw (Texas → needs_input place ambiguity, all sections abstained, 5 real candidates w/ popularity) is by design (D10/D12).
+- P4 polish pass 2 (same day, after user's hung-run report): (1) root causes of the stuck grounded pane — the model re-called `qloo_audience_demographics` with identical args after a zero-candidate `needs_input` (known P2 abstain-case), then silence (free-tier latency + retry waits, no visible feedback). Fixes: `GroundedTools.dispatch` short-circuits exact (tool+args) repeats of zero-candidate needs_input calls with an honest `DEAD_END` envelope (regression test `test_needs_input_zero_candidates_repeat_is_dead_end` — 58 mocked green); system-prompt rules 3/4 reworded (resolve ambiguous words via find_tags URN first; never repeat an identical call; dead-ends → honest_absences); `Engine._execute` wraps `runner.run` in `asyncio.wait_for(600s)` so EVERY run reaches run_done deterministically; panes show a ticking `running… Ns` (startedAt passed from the drive handler — React-compiler lint forbids setState-sync/refs/Date.now in render; PS 5.1 round-trips of UTF-8 TSX must be BOM-stripped and are best avoided: lint+build only pass after editor-tool fixes). Backend restarted pid 15112 (groq).
+- Next: P5 deploy, next command `ssh tfaster@ec2-host "docker compose -f /opt/tastewell/docker-compose.yml ps"` — but first: `deploy/` files (Dockerfile.backend, Dockerfile.frontend, docker-compose.yml, Caddyfile, smoke_test.sh) do not exist yet; start with §6.2 image specs.
+- Session env note: backend currently RUNNING at :8000 (pid 25548, groq provider) and Next dev at :3000 (npm run dev, hidden cmd). e2e smoke: `npm run e2e:smoke` (mocked); live UI drive: `E2E_LIVE=1 npx playwright test e2e/live.spec.ts` (burns ~16 LLM reqs).
 ---
 
 ### P5 — Deploy (Oct 26–28)
