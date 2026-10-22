@@ -168,3 +168,34 @@ def test_parse_brief_json_variants():
         'Here it is: {"audience_profile": "x"} — thanks!'
     ) == {"audience_profile": "x"}
     assert parse_brief_json("not json") is None
+
+
+@pytest.mark.asyncio
+async def test_needs_input_zero_candidates_repeat_is_dead_end():
+    """Same tool+args twice, first returns needs_input with no candidates ->
+    second call is short-circuited with an honest DEAD_END envelope and the
+    fake client is not hit again (regression: agent looped on it, run hung)."""
+    provider = FakeProvider([
+        Reply(tool_calls=[{"id": "t1", "name": "qloo_audience_demographics",
+                           "args": {"entity": "millennials", "limit": 5}}]),
+        Reply(tool_calls=[{"id": "t2", "name": "qloo_audience_demographics",
+                           "args": {"entity": "millennials", "limit": 5}}]),
+        Reply(content=json.dumps(FINAL_BRIEF)),
+    ])
+    ni = NormalizedResult(
+        status="needs_input", operation="audience_demographics",
+        result_count=0, candidates=[],
+        summary="Choose the intended Qloo entity.",
+    )
+    client = FakeClient([ni])
+    client.tools["qloo_audience_demographics"] = {"type": "object"}
+    runner, tools = grounded_runner(provider, client, max_steps=6)
+    outcome = await runner.run(BriefRequest("natural wine bar"))
+    assert outcome.status == "ok"
+    # client hit exactly ONCE (repeat was short-circuited)
+    assert len(client.ops) == 1
+    dead = [
+        ev for ev in tools.trace.events
+        if ev.get("type") == "tool_result" and ev.get("error_code") == "DEAD_END"
+    ]
+    assert dead and dead[0]["status"] == "error"

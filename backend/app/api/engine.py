@@ -68,8 +68,12 @@ class RunState:
             out["exit_status"] = self.outcome.status
             out["needs_input"] = self.outcome.needs_input
             out["brief"] = self.outcome.brief
-        elif self.error:
-            out["error"] = self.error
+        elif self.status in ("done", "error"):
+            # Terminal after a crash/timeout (e.g. the 600s wall killed the
+            # run) — surface so pollers don't treat the run as in-flight.
+            out["exit_status"] = "done" if self.status == "done" else "error"
+            if self.error:
+                out["error"] = self.error
         return out
 
 
@@ -170,7 +174,9 @@ class Engine:
                 brief=req.brief, region=req.region, audience=req.audience,
                 extras={"city": req.city} if req.city else {},
             )
-            state.outcome = await runner.run(brief_req)
+            state.outcome = await asyncio.wait_for(
+                runner.run(brief_req), timeout=600.0
+            )
             state.status = "done"
         except (ProviderConfigError, MissingCredential, RuntimeError) as exc:
             state.error = redact(str(exc))

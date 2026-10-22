@@ -156,7 +156,7 @@ async def test_http_429_budget_exhausted():
     p._sleep = fake_sleep
     with pytest.raises(RuntimeError):
         await p.chat([{"role": "user", "content": "hi"}])
-    assert calls["n"] == 3  # initial + 2 retries
+    assert calls["n"] == 4  # initial + 3 retries
     await p._client.aclose()
 
 

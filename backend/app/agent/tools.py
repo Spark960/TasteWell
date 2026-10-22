@@ -7,6 +7,7 @@ full envelopes stay in trace + evidence.
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any, Awaitable, Callable
 
@@ -50,6 +51,13 @@ class GroundedTools:
         self._model_call = model_call
         self.evidence: list[dict] = []
         self.calls_made: list[tuple[str, dict]] = []
+        # (tool, args) pairs that came back needs_input with zero candidates —
+        # re-calling them cannot resolve the ambiguity (P2 live finding), so a
+        # repeat gets an honest DEAD_END envelope instead of a fresh Qloo call.
+        self._dead_ends: set[str] = set()
+
+    def _call_key(self, name: str, args: dict) -> str:
+        return f"{name}|{json.dumps(args, sort_keys=True, ensure_ascii=False)}"
 
     def llm_specs(self) -> list[dict]:
         specs = []
@@ -72,12 +80,24 @@ class GroundedTools:
     async def dispatch(self, name: str, args: dict) -> dict:
         """Run a qloo_* tool; returns the compact model-facing dict."""
         operation = name.removeprefix("qloo_")
+        call_key = self._call_key(name, args)
         unknown = (
             self.client.tools
             and name not in self.client.tools
             and name != "qloo_capabilities"
         )
-        if unknown:
+        if call_key in self._dead_ends:
+            result = NormalizedResult(
+                status="error", operation=operation,
+                error_code="DEAD_END", retryable=False,
+                recovery=(
+                    "This exact call already returned needs_input with no "
+                    "candidates — re-calling it cannot help. Abstain from "
+                    "this thread (list it in honest_absences) and continue "
+                    "with other tools."
+                ),
+            )
+        elif unknown:
             result = NormalizedResult(
                 status="error", operation=operation,
                 error_code="NO_SUCH_TOOL", retryable=False,
@@ -85,6 +105,8 @@ class GroundedTools:
             )
         else:
             result = await self.client.call_tool(operation, args)
+            if result.status == "needs_input" and not result.candidates:
+                self._dead_ends.add(call_key)
         self._trace_call(name, args, result)
         self.calls_made.append((name, args))
         self.evidence.append(self._evidence(result))

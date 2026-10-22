@@ -37,11 +37,17 @@ HARD RULES:
 Never claim an individual's behavior, never causal claims, never "will buy".
 2. Every taste claim in each section must be traceable: cite the Qloo ids \
 (tag URNs / entity ids) it came from. Claims that trace to no id are banned.
-3. If a tool returns needs_input: STOP expanding that thread — put the \
-candidates in "needs_input" (id, name, type, popularity) and say what choice \
-would unblock.
-4. If a tool returns empty/degraded: say so plainly ("no grounded result — \
-the request came back empty") and OMIT that section rather than inventing.
+3. If a tool returns needs_input with CANDIDATES: STOP expanding that thread \
+— put the candidates in "needs_input" (id, name, type, popularity) and say \
+what choice would unblock. If needs_input has NO candidates it is a dead \
+end: NEVER re-call the same tool with the same arguments — first try to \
+resolve the ambiguous word with qloo_find_tags and pass the resolved tag \
+URN / entity id; if that also dead-ends, omit the affected section and \
+list it in "honest_absences".
+4. Never repeat a tool call with identical arguments if the previous \
+identical call did not give you what you need. If a tool says empty, \
+degraded, or error: say so plainly ("no grounded result — the request came \
+back empty") and OMIT that section rather than inventing.
 5. Use section names exactly as given. Never mention tools in the prose \
 except through citations.
 """
@@ -64,8 +70,12 @@ Respond with ONLY a JSON object (no markdown fence, no prose) shaped:
 """
 
 _GENERIC_SHAPE = """
-Each string in a section must stay in aggregate framing. Every claim is your
-guess — you have no evidence ids, so do NOT add "(id:…)" citations to sections.
+You are ungrounded by design in this mode — do NOT treat that as a reason to
+abstain. Fill EVERY section (menu_tilt, music_programming, adjacent_brands,
+tag_themes too) with concrete, practical guesses from general knowledge.
+honest_absences must be an empty list. Keep aggregate framing ("people in
+this audience/area tend to..."). Every claim is your guess — you have no
+evidence ids, so do NOT add "(id:…)" citations to sections.
 """
 
 
@@ -218,6 +228,12 @@ class AgentRunner:
         while steps_left > 0:
             steps_left -= 1
             outcome.steps += 1
+            # Log BEFORE the provider call: Groq 429-retry waits can stall a
+            # step for 30s+ and the trace would otherwise go dark.
+            self.trace and self.trace.log(
+                "llm_started", step=outcome.steps,
+                mode=mode, tools=bool(specs),
+            )
             reply = await self.provider.chat(messages, tools=specs)
             self.trace and self.trace.log(
                 "llm", step=outcome.steps,

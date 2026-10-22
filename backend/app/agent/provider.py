@@ -19,7 +19,12 @@ from app.qloo.redact import redact, register_secret
 
 log = logging.getLogger("tastewell.llm")
 
-_MAX_429_RETRIES = 2
+_MAX_429_RETRIES = 3
+# Free-tier quota reality (Oct 2026): Groq gpt-oss-120b on-demand = 8k TPM
+# but also a rolling ~200k TPD; retry-after can demand minutes when the
+# steady-burn release rate is slow. Cap each wait so no single step eats the
+# whole 600s run deadline, but let it cover a TPD window (~4 min).
+_MAX_429_WAIT = 240.0
 
 _TOOL_VALIDATION = "Tool call validation failed"
 
@@ -78,7 +83,8 @@ class LlmProvider:
         model: str = "",
         base_url: str = "",
         client: httpx.AsyncClient | None = None,
-        max_tokens: int = 16384,
+        max_tokens: int = 4096,
+        reasoning_effort: str = "low",
     ) -> None:
         # NB: Gemini 3.x counts hidden thinking tokens against max_tokens —
         # a 2k cap truncates output mid-string (finish_reason: length).
@@ -95,6 +101,12 @@ class LlmProvider:
             )
         register_secret(self.api_key)
         self.max_tokens = max_tokens
+        # gpt-oss reasoning burn: full 'high' thinking both adds wall-clock
+        # latency and burns daily token quota output-side; low is plenty for
+        # a schema-shaped JSON brief.
+        self.reasoning_effort = (
+            reasoning_effort if "gpt-oss" in self.model else None
+        )
         self._client = client or httpx.AsyncClient(timeout=120)
         self._sleep: Any = asyncio.sleep
 
@@ -109,6 +121,8 @@ class LlmProvider:
             "messages": messages,
             "max_tokens": self.max_tokens,
         }
+        if self.reasoning_effort:
+            body["reasoning_effort"] = self.reasoning_effort
         if tools:
             body["tools"] = tools
             body["tool_choice"] = "auto"
@@ -162,6 +176,7 @@ class LlmProvider:
                     wait = float(resp.headers.get("retry-after", "25"))
                 except ValueError:
                     wait = 25.0
+                wait = min(wait, _MAX_429_WAIT)
             elif resp.status_code in (500, 502, 503):
                 wait = 10.0 * (attempt + 1)
             if wait is None or attempt >= _MAX_429_RETRIES:
