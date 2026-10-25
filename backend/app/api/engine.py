@@ -87,6 +87,7 @@ def default_provider_factory(settings: Settings, req: RunRequest) -> LlmProvider
         "gemini": settings.gemini_api_key,
         "openai": settings.openai_api_key,
         "groq": settings.groq_api_key,
+        "openrouter": settings.openrouter_api_key,
     }
     key = key_map.get(settings.llm_provider, "")
     register_secret(key)

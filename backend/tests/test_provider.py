@@ -187,6 +187,22 @@ def test_provider_config_validation():
         LlmProvider(provider="gemini", api_key="")
 
 
+def test_openrouter_provider_registered():
+    """OpenRouter is a first-class provider: same wire format, cheap paid
+    routing without Groq's 8k per-request TPM wall."""
+    from app.agent.provider import PROVIDERS
+
+    conf = PROVIDERS["openrouter"]
+    assert conf["base_url"] == "https://openrouter.ai/api/v1"
+    assert conf["key_field"] == "openrouter_api_key"
+    p = LlmProvider(provider="openrouter", api_key="k" * 12)
+    assert p.model == "openai/gpt-oss-120b"
+    assert p.reasoning_effort == "low"  # gpt-oss family honors low
+    p2 = LlmProvider(provider="openrouter", api_key="k" * 12,
+                     model="openai/gpt-oss-20b")
+    assert p2.model == "openai/gpt-oss-20b"
+
+
 @pytest.mark.asyncio
 async def test_http_413_shrinks_history_then_succeeds():
     """Groq 8k TPM hard-rejects over-sized single requests (413); the retry

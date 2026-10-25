@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     openai_api_key: str = ""
     groq_api_key: str = ""
+    openrouter_api_key: str = ""
 
     def require_qloo_key(self) -> str:
         if not self.qloo_api_key and self.app_env != "dev":

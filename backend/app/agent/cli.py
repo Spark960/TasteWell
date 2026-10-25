@@ -144,6 +144,7 @@ def _llm_key(settings) -> str:
         "gemini": settings.gemini_api_key,
         "openai": settings.openai_api_key,
         "groq": getattr(settings, "groq_api_key", ""),
+        "openrouter": getattr(settings, "openrouter_api_key", ""),
     }
     key = mapping.get(get_settings().llm_provider, "")
     if key:

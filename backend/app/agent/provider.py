@@ -129,11 +129,20 @@ PROVIDERS: dict[str, dict[str, str]] = {
         "default_model": "gpt-4.1-mini",
         "key_field": "openai_api_key",
     },
-        "groq": {
-            "base_url": "https://api.groq.com/openai/v1",
-            "default_model": "openai/gpt-oss-120b",
-            "key_field": "groq_api_key",
-        },
+    "groq": {
+        "base_url": "https://api.groq.com/openai/v1",
+        "default_model": "openai/gpt-oss-120b",
+        "key_field": "groq_api_key",
+    },
+    # Paid-but-pennies routing (no 8k TPM per-request wall like Groq free):
+    # gpt-oss-120b $0.15/$0.60 per 1M, gpt-oss-20b $0.018/$0.09 per 1M
+    # (~0.07-0.5 cents per double-run). Switch with LLM_PROVIDER=openrouter
+    # and optionally LLM_MODEL=openai/gpt-oss-20b.
+    "openrouter": {
+        "base_url": "https://openrouter.ai/api/v1",
+        "default_model": "openai/gpt-oss-120b",
+        "key_field": "openrouter_api_key",
+    },
 }
 
 

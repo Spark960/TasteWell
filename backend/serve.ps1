@@ -24,8 +24,9 @@ foreach ($l in $lines) {
         [Environment]::SetEnvironmentVariable($matches[1], $matches[2], "Process")
     }
 }
-$env:LLM_PROVIDER = "groq"
-$env:LLM_MODEL = "openai/gpt-oss-120b"
+# Provider/model: .env wins; these defaults keep the historical Groq setup.
+if (-not $env:LLM_PROVIDER) { $env:LLM_PROVIDER = "groq" }
+if (-not $env:LLM_MODEL) { $env:LLM_MODEL = "openai/gpt-oss-120b" }
 
 $proc = Start-Process py -ArgumentList "-3.12","-m","uvicorn","app.main:app","--port","$Port" `
     -WorkingDirectory (Join-Path $repo "backend") -WindowStyle Hidden `
