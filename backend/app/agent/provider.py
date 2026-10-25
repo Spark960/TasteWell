@@ -28,6 +28,68 @@ _MAX_429_WAIT = 240.0
 
 _TOOL_VALIDATION = "Tool call validation failed"
 
+# Groq hard-rejects any single request whose prompt exceeds the 8k TPM
+# window with HTTP 413 (deterministic, not a rate-limit wait). Recovery:
+# shrink the message history — tool-result rows are ~90% of the bloat and
+# they already live in trace + evidence, so the model only needs the
+# envelope summaries of older calls to keep writing a cited brief.
+_KNOWN_ERROR = (json.JSONDecodeError, AttributeError, TypeError)
+
+
+def _shrink_tool_messages(
+    messages: list[dict], keep_full_last: int
+) -> list[dict]:
+    tool_idx = [i for i, m in enumerate(messages) if m.get("role") == "tool"]
+    if not tool_idx:
+        return messages
+    keep_full = set(tool_idx[-keep_full_last:]) if keep_full_last else set()
+    shrunk: list[dict] = []
+    for i, m in enumerate(messages):
+        if i not in keep_full and m.get("role") == "tool" and isinstance(
+            m.get("content"), str
+        ):
+            try:
+                env = json.loads(m["content"])
+                compact = {
+                    k: env[k] for k in ("status", "operation",
+                                        "result_count", "summary")
+                    if k in env
+                }
+            except _KNOWN_ERROR:
+                compact = {}
+            shrunk.append({**m, "content": json.dumps(compact,
+                                                      ensure_ascii=False)})
+        else:
+            shrunk.append(m)
+    return shrunk
+
+
+def _shrink_levels(body: dict) -> list[dict]:
+    """Bodies to retry after a too-large rejection, most information kept
+    first: (1) older tool rows -> envelope summaries, newest kept full;
+    (2) ALL tool rows -> summaries; (3) tool schemas dropped as a last
+    resort so the model answers from the collapsed history alone."""
+    messages = body.get("messages") or []
+    concrete: list[dict] = []
+
+    def add(b: dict) -> None:
+        if b not in concrete:
+            concrete.append(b)
+
+    if messages:
+        m1 = _shrink_tool_messages(messages, keep_full_last=1)
+        if m1 != messages:
+            add({**body, "messages": m1})
+        m2 = _shrink_tool_messages(messages, keep_full_last=0)
+        if m2 != messages:
+            add({**body, "messages": m2})
+        if m2 != messages and body.get("tools"):
+            b3 = {**body, "messages": m2}
+            b3.pop("tools", None)
+            b3.pop("tool_choice", None)
+            add(b3)
+    return concrete
+
 _SCHEMA_NUDGE = (
     "Your previous tool call was rejected because its arguments did not "
     "match the tool's declared input schema. Re-issue the tool call with "
@@ -127,6 +189,19 @@ class LlmProvider:
             body["tools"] = tools
             body["tool_choice"] = "auto"
         resp = await self._post(body)
+        # 413 = single-request prompt over the free-tier TPM ceiling; it is
+        # deterministic, so shrink the history and re-ask immediately.
+        if resp.status_code == 413 and body.get("messages"):
+            for level, shrunk_body in enumerate(_shrink_levels(body), 1):
+                log.warning("llm 413 too-large — shrink retry %d", level)
+                resp = await self._post(shrunk_body)
+                if resp.status_code != 413:
+                    break
+            if resp.status_code == 413:
+                raise RuntimeError(
+                    "LLM 413: prompt too large even shrunk "
+                    f"(model {self.model}, 8k TPM)"
+                )
         # Groq validates the model's proposed tool args against the schema
         # and 400s strict (Gemini tolerates slips) — these are random model
         # mistakes: bounded corrective retries, never a user-visible abort.

@@ -22,6 +22,12 @@ _MODEL_KEYS = (
     "affinity", "affinity_rank", "description",
 )
 
+# Groq free tier hard-rejects ANY request over the 8k TPM ceiling with HTTP
+# 413 — prompt tokens only (live 2026-10-22: a 3-envelope history asked for
+# 8088 tokens and the final step died). `description` rows are the bloat
+# driver (~150 chars x 10 rows x 3 envelopes); truncate model-facing ones.
+_DESCRIPTION_CAP = 120
+
 # Default LLM-facing tool subset (token budget: the full live surface is
 # ~10.2k chars of schemas; Groq free tier allows 8k tokens/min, so each extra
 # schema costs whole steps/min). This four-tool chain covers the brief:
@@ -57,6 +63,18 @@ def _contains_tag_urn(value: Any) -> bool:
     return False
 
 
+def _cap_texts(value: Any) -> Any:
+    if isinstance(value, str) and value.startswith("urn:"):
+        return value
+    if isinstance(value, str) and len(value) > _DESCRIPTION_CAP:
+        return value[: _DESCRIPTION_CAP - 1].rstrip() + "\u2026"
+    if isinstance(value, list):
+        return [_cap_texts(v) for v in value]
+    if isinstance(value, dict):
+        return {k: _cap_texts(v) for k, v in value.items()}
+    return value
+
+
 def compact_row(row: dict, depth: int = 0) -> dict:
     if depth > 1 or not isinstance(row, dict):
         return row if isinstance(row, (str, int, float)) else {}
@@ -67,7 +85,7 @@ def compact_row(row: dict, depth: int = 0) -> dict:
                       for k2, v2 in list(v.items())[:6]}
         elif k not in out and isinstance(v, (str, int, float)):
             out[k] = v
-    return out
+    return _cap_texts(out)
 
 
 class GroundedTools:

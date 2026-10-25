@@ -185,3 +185,71 @@ def test_provider_config_validation():
         LlmProvider(provider="nope", api_key="k" * 12)
     with pytest.raises(ProviderConfigError):
         LlmProvider(provider="gemini", api_key="")
+
+
+@pytest.mark.asyncio
+async def test_http_413_shrinks_history_then_succeeds():
+    """Groq 8k TPM hard-rejects over-sized single requests (413); the retry
+    must collapse older tool messages to envelope summaries and succeed
+    without burning the 429 budget."""
+    bodies: list[dict] = []
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        bodies.append(json.loads(req.content.decode("utf-8")))
+        if len(bodies) == 1:
+            return httpx.Response(413, json={"error": {"message": "too large"}})
+        return httpx.Response(200, json={"choices": [
+            {"message": {"content": "ok"}}]})
+
+    p = provider(handler)
+    old_tool = json.dumps({
+        "status": "ok", "operation": "recommend", "result_count": 10,
+        "summary": "Top ties for the audience.",
+        "results": [{"name": f"row{i}", "description": "x" * 150}
+                    for i in range(10)],
+    })
+    reply = await p.chat([
+        {"role": "system", "content": "sys"},
+        {"role": "user", "content": "brief"},
+        {"role": "assistant", "content": "", "tool_calls": []},
+        {"role": "tool", "tool_call_id": "t-old", "name": "qloo_recommend",
+         "content": old_tool},
+        {"role": "tool", "tool_call_id": "t-new", "name": "qloo_find_tags",
+         "content": json.dumps({"status": "ok", "operation": "find_tags",
+                                "result_count": 10, "summary": "tags"})},
+    ], tools=[{"type": "function", "function": {"name": "qloo_find_tags"}}])
+    assert reply.content == "ok"
+    assert len(bodies) == 2
+    shrunken = bodies[1]["messages"]
+    old = next(m for m in shrunken if m.get("tool_call_id") == "t-old")
+    new = next(m for m in shrunken if m.get("tool_call_id") == "t-new")
+    assert json.loads(old["content"]) == {
+        "status": "ok", "operation": "recommend", "result_count": 10,
+        "summary": "Top ties for the audience.",
+    }
+    assert new["content"] == bodies[0]["messages"][4]["content"]
+    assert bodies[1]["tools"] == bodies[0]["tools"]
+    await p._client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_http_413_final_level_drops_tool_schemas():
+    def handler(req: httpx.Request) -> httpx.Response:
+        return httpx.Response(413, json={"error": {"message": "too large"}})
+
+    p = provider(handler)
+    with pytest.raises(RuntimeError, match="even shrunk"):
+        await p.chat([
+            {"role": "system", "content": "sys"},
+            {"role": "user", "content": "brief"},
+            {"role": "tool", "tool_call_id": "t0", "name": "t",
+             "content": json.dumps({"status": "ok", "summary": "s"})},
+        ], tools=[{"type": "function", "function": {"name": "qloo_find_tags"}}])
+    await p._client.aclose()
+
+
+def test_shrink_levels_covers_no_tool_messages():
+    from app.agent.provider import _shrink_levels
+
+    body = {"messages": [{"role": "user", "content": "hi"}], "tools": [{}]}
+    assert _shrink_levels(body) == []
