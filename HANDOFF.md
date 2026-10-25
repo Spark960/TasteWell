@@ -1,10 +1,10 @@
-# HANDOFF - fresh session (2026-10-22 midday, session ended leaving)
+# HANDOFF - fresh session (2026-10-25)
 
-> Start with this file. `IMPLEMENTATION.md` remains the deep source of truth
-> (decisions log, phases, runbook 6, operating notes 10). This bridge captures
-> the 2026-10-22 midday session state + exactly what to do next.
-> **Servers: all KILLED (no changes this session). Tree: clean as of the
-> final commit except nothing pending.**
+> Start with this file. `IMPLEMENTATION.md` is the deep source of truth
+> (decisions log, phases, runbook §6, operating notes §10). This bridge is
+> the session state + next steps.
+> **Tree: clean, everything committed. Servers are UP (see §7) - the user
+> asked to see the demo, do not assume they were killed.**
 
 ## 0. Where we are
 
@@ -14,151 +14,130 @@
 | P1 adapter layer | done |
 | P2 MCP agent loop + CLI | done |
 | P3 FastAPI + SSE HTTP layer | done |
-| P4 Next.js UI | committed (`d29d12b`, `384b408`); hardening committed (`c05305b`, this session) |
-| **P4.1 preset expansion** | **IN PROGRESS - this session's active task (see section 2)** |
-| P5 deploy | next - `deploy/` still does not exist |
+| P4 Next.js UI | done (`d29d12b`, `384b408`, `c05305b`) |
+| P4.1 presets 3 -> 9 | done + live-verified (`d76aeda`) |
+| P4.2 Groq 413 fix | done + live-verified (`ae9a644`) |
+| P4.3 minimal tool chain | done + live-verified (`dbc8a79`) |
+| P5 deploy | NEXT - `deploy/` does not exist yet |
 | P6 submission | deadline Oct 29 internal, hard Oct 30 11:45pm EDT |
 
-## 1. What happened this session (2026-10-22 midday)
+Commits this session: `c05305b` (loop hardening) -> `5c6d720` (handoff)
+-> `d76aeda` (presets 9 + contract demographics) -> `ae9a644` (413 fix)
+-> `dbc8a79` (tool-chain trim). Tests: **66 mocked backend green**
+(`py -3.12 -m pytest -q` in backend; 1 live skipped), frontend
+lint + build + 3 Playwright smoke green.
 
-1. **Committed all pending backend hardening as `c05305b`** (the previous
-   handoff flagged it as uncommitted): zero-candidate dead-end now bans the
-   tool FAMILY for the whole run; `urn:tag:*` URNs are rejected before they
-   reach entity-only args (probe-verified they always return zero-candidate
-   needs_input and loop the model); `qloo_capabilities` + 5 unused tools
-   trimmed from LLM specs into `DEFAULT_LLM_TOOLS` (token budget: Groq 8k
-   TPM); transient QLOO_DNS/QLOO_TIMEOUT/QLOO_NETWORK retried even when
-   envelope says retryable=false. +4 tests. **63 mocked tests green**
-   (`py -3.12 -m pytest -q` in backend: 63 passed, 1 skipped live).
-2. **Verified the live run this morning performed as designed** (user-pasted
-   trace): grounded run 05:46:44 -> 05:47:43 = ~59s, 23 trace events, 3 Qloo
-   envelopes, exit=ok; ungrounded pane still intentionally fake + honest
-   disclaimer. The hardening is working; no further loop fixes needed.
-3. **Preset expansion started** (user complaint: "very limited selection,
-   only 3 options" -> the 3 chips in `BriefForm.tsx`). Quota-safe tag probing
-   done (direct `qloo exec` harness calls, no LLM steps). Implementation NOT
-   started - that is exactly where the session stopped.
+## 1. Live verification done this session (trust these numbers)
 
-## 2. ACTIVE TASK: presets 3 -> 9 (verified data - do not re-probe)
+- **craft beer** (Denver / men 25-34): 109s, 18 events, exit=ok, all brief
+  sections grounded (menu=cuisine tags, artists + brands with entity ids).
+- **record store** (Bushwick / gen z): FAILED before the 413 fix (final step,
+  "Requested 8088 tokens, limit 8000"); AFTER fix: 55s, 18 events, ok.
+- **coffee** (Silver Lake / gen z): 143s + 6 envelopes + music section
+  dropped (model detours via describe/where_popular/extra recommends) BEFORE
+  the tool trim. After trim: 51s, 2 envelopes, ALL 5 sections, zero absences.
+- **jazz club** (Harlem / young women), browser demo after trim: **38s wall,
+  3 Qloo envelopes, 23 events, sections: menu/music/brands/tags + audience
+  profile, no absences**; grounded artists H.E.R. + SZA, brands Glossier /
+  CUUP, honest tag themes. Ungrounded pane finished in ~5s with its designed
+  "no Qloo data" note.
+- Screenshots: `%TEMP%\opencode\demo_shots2\{01_selected,02_running_10s,
+  05_final}.png` (Playwright demo driver: `%TEMP%\opencode\demo_shot2.cjs`).
 
-### Verified via `qloo exec find_tags` (semantic, all `[ok]`, 10 results each)
-Specialty coffee | Jazz club | Ramen | Barbecue | Craft beer | Izakaya |
-Vegan | Bubble tea | Speakeasy | Record store | Hot pot | Baked goods.
-=> Any of these can be a preset venue concept.
+## 2. The three fixes that mattered (do not regress)
 
-### Verified via `qloo exec recommend` (signal_tags=[urn:tag:genre:music:jazz], limit 5)
-DEMOS THAT ARE SAFE (ok, 5 rows):
-- `gen z` @ `Silver Lake, Los Angeles` (first: Dam-Funk)
-- `young families` @ `Austin, Texas` (first: NoName)
-- `young women` @ `Harlem, Manhattan` (first: H.E.R.)
-- `men 25-34` @ `Denver, Colorado` (first: Vulfpeck)
+1. **Groq free tier hard-rejects ANY single request >8k tokens with HTTP
+   413** - deterministic, not a 429 wait; it killed a final step at
+   "Requested 8088". Guard rails now:
+   - `tools._cap_texts` truncates model-facing `description` prose to 120
+     chars (URN/ids untouched; evidence + UI keep full text).
+   - `provider._shrink_levels` 413 recovery: collapse older -> all tool rows
+     to envelope summaries, then drop tool schemas; retried inline.
+2. **Tool detours**: LLM tool surface is now ONLY `find_tags` +
+   `recommend` (`DEFAULT_LLM_TOOLS`); prompt rule 2 demands exactly one
+   artist + one brand recommend, then final. Each extra step costs a whole
+   TPM window on free tier. `qloo_describe`/`qloo_where_popular` remain
+   available over MCP but are not exposed to the model (no section needs
+   them).
+3. **Dead-end family ban + tag-URN guard** (previous session, `c05305b`):
+   zero-candidate needs_input bans the tool for the rest of the run;
+   `urn:tag:*` in entity-only args is rejected pre-flight.
 
-DEMOS THAT DEAD-END (needs_input, implementation must NOT use):
-`families` | `parents` | `college students` | `couples` | `tourists`.
-(Verified independent of location: families failed @ Queens AND @ Austin.)
-**The existing taco preset's audience `families` is UNSAFE - it must become
-`young families`.**
+## 3. Presets (done, verified - do not re-probe)
 
-### Planned final catalog (place into `frontend/app/components/BriefForm.tsx` PRESETS)
-1. Natural wine bar / millennials / Brooklyn, New York      [all verified]
-2. Taco shop / young families / Austin, Texas               [verified today]
-3. Listening bar / young professionals / Williamsburg       [live-verified]
-4. Specialty coffee / gen z / Silver Lake, Los Angeles      [verified today]
-5. Izakaya / young professionals / East Village, Manhattan  [audience verified LIVE (Williamsburg); exact location pair NOT probed]
-6. Jazz club / young women / Harlem, Manhattan              [verified today]
-7. Craft beer / men 25-34 / Denver, Colorado                [verified today]
-8. Bubble tea / gen z / Monterey Park, California           [pair NOT probed]
-9. Record store / gen z / Bushwick, New York                [pair NOT probed]
+`frontend/app/components/BriefForm.tsx` PRESETS (short chips, full values
+fill the three inputs):
+1. Wine bar / natural wine bar / Brooklyn / millennials
+2. Tacos / taco shop / Austin, Texas / young families
+3. Listening bar / listening bar / Williamsburg / young professionals
+4. Coffee / specialty coffee shop / Silver Lake, Los Angeles / gen z
+5. Izakaya / izakaya / East Village, Manhattan / young professionals
+6. Jazz club / jazz club / Harlem, Manhattan / young women
+7. Craft beer / craft beer hall / Denver, Colorado / men 25-34
+8. Bubble tea / bubble tea shop / Monterey Park, California / gen z
+9. Record store / vinyl record store / Bushwick, New York / gen z
 
-### Remaining steps, in order
-1. ONE probe round for the 3 unproven pairs (2s spacing, ~1 min):
-   recommend(signal_tags=[urn:tag:genre:music:jazz], target_type=artist,
-   limit=5) for: gen z + `Monterey Park, California`; gen z + `Bushwick, New York`;
-   young professionals + `East Village, Manhattan`. Swap in probed-safe
-   locations (Silver Lake / Denver / Harlem / Williamsburg) for any that
-   needs_input. Reusable probe scripts: `%TEMP%\opencode\preset_demo_probe.ps1`
-   and `preset_demo_probe2.ps1` (edit the `Probe` list; keep ASCII-only).
-2. Edit `BriefForm.tsx` PRESETS with the catalog above. UI change: chips
-   should use SHORT venue-only labels ("Wine bar", "Tacos", "Listening bar",
-   "Coffee", "Izakaya", "Jazz club", "Craft beer", "Bubble tea", "Record
-   store") - full combined labels wrap badly in the 300px sidebar (one chip
-   ~= one row); the full combination is visible in the three inputs after
-   click. Keep the existing chip style/classes.
-3. `npm run lint`, `npm run build`, `npm run e2e:smoke` in `frontend/`
-   (react-compiler lint rules apply - see quirks). Playwright smoke mocks
-   `**/api/agent/runs/**`; preset count changes should not touch tests, but
-   verify.
-4. Persist today's demographic findings into `docs/qloo-contract.md`
-   (safe/unsafe free-text demographic list; note the demographic-word
-   needs_input failure mode and zero-candidate needs_input = dead-end).
-   Also note `young families`,
-   `men 25-34`, `young women`, `gen z` verified live 2026-10-22.
-5. Then ONE live browser run of 2-3 new presets via `backend\serve.ps1` +
-   `npm run dev` (each grounded double-run costs ~11k TPD of ~200k; budget
-   is fine). Confirm every section populated, no dead-end omissions.
+Audience rule (live-verified, also in `docs/qloo-contract.md`): SAFE =
+millennials, young professionals, gen z, young women, men 25-34, young
+families. DEAD-END (needs_input, zero candidates -> section omitted) =
+families, parents, college students, couples, tourists. Concept words all
+resolve (specialty coffee, jazz club, ramen, barbecue, craft beer, izakaya,
+vegan, bubble tea, speakeasy, record store, hot pot, baked goods).
 
-## 3. State of the two sides (unchanged this session)
+## 4. Expected live behavior (for demos)
 
-- Frontend `frontend/`: Next 16.4.2 App Router, TS, Tailwind 4. Key files:
-  `app/TastewellApp.tsx` (two-pane driver + re-drive on pick),
-  `app/components/BriefForm.tsx` (PRESETS - the file being edited),
-  `components/ResultPane.tsx`, `components/TracePanel.tsx`, `lib/api.ts`
-  (SSE stream ends at `run_done`).
-- Backend `backend/`: FastAPI :8000 + SQLite run registry + agent loop;
-  restart ONLY via `backend\serve.ps1` (kills :8000 first, asserts bind).
-  Provider: `LLM_PROVIDER=groq`, `LLM_MODEL=openai/gpt-oss-120b`.
-
-## 4. Known root cause of old slow runs (condensed)
-
-Groq free tier = 8k TPM rolling + ~200k TPD; a drilled TPD 429-chains past
-the 600s wall. Plus a silent-restart trap (plain Start-Process cannot bind
-:8000 while the old process lives, health still answers 200 -> stale app).
-Both are handled now (fresh key account + reasoning_effort=low + serve.ps1).
-Full detail: IMPLEMENTATION.md runbook.
+Grounded run: ~40-70s for 3 envelopes/23-ish events on a fresh quota;
+occasionally ~2 min if a TPM window is tight - the pane shows a ticking
+`running… Ns` and the trace keeps moving, so narrate the contrast while it
+runs. Ungrounded pane: 2-8s. One double-run costs ~10-15k TPD of ~200k.
 
 ## 5. Quirks/lessons (still true - do not relearn)
 
-- **PS 5.1 + UTF-8 = footgun.** Non-ASCII (em-dash) in a .ps1 gets
-  misdecoded and EXECUTED as garbage - keep .ps1 ASCII-only. Write source
-  files via editor tools, never PS cmdlets.
-- **`py -3.12 script.py` buffers stdout without a TTY** - always `py -3.12 -u`.
+- **PS 5.1 + Unicode = footgun.** New concrete case: `Get-Content | -replace
+  ... | Set-Content` mangled a JS regex's U+2026 ellipsis into `???` and the
+  demo script died on a Node syntax error. Do not round-trip source files
+  through PS text cmdlets; use editor tools. .ps1 files stay ASCII-only
+  (non-ASCII lines get executed as garbage).
+- **`py -3.12` buffers stdout without a TTY** - always `py -3.12 -u`.
 - **py.exe launcher pid != owner pid** - assert restarts via uvicorn log
   content, never pids.
-- **Playwright mocks:** glob `*` does not cross `/` - register
-  `**/api/agent/run/**` AND `**/api/agent/runs/**` separately.
+- **Playwright mocks:** glob `*` does not cross `/`; register
+  `**/api/agent/run/**` AND `**/api/agent/runs/**`. Real-browser driver:
+  require playwright by absolute path from `frontend/node_modules` when the
+  script lives in %TEMP%.
 - **React-compiler lint:** no setState in effect body, no ref/Date.now()
-  reads during render; clocks must be parent-handler -> prop -> interval.
-- **PS 5.1 npm shims mangle inline --input JSON** - always `--input-file`.
-- Quota hygiene: sequential, 2s spacing; never loop probes.
-- Live demographic probes (recommend) DID behave independently of location:
-  demographic WORD is what failed, so verified words are portable.
+  reads during render. Clocks: parent handler -> prop -> interval setState.
+- **PS 5.1 npm shims mangle inline --input JSON** - always `--input-file`
+  with `qloo exec`.
+- Quota hygiene: probes sequentially, 2s spacing, never loop.
+- `ngrok`-style public tunnels: not needed; P5 is EC2/Caddy per runbook.
 
-## 6. Next steps after P4.1 (unchanged plan)
+## 6. Next steps, in order
 
-1. P5 deploy: `deploy/` (Dockerfiles, compose, Caddyfile, smoke_test.sh,
-   bootstrap.sh) - AWS t3.micro, plan B Fly.io (IMPLEMENTATION.md 6.x).
-2. Lighthouse a11y >= 95 check (open).
-3. P6 package: MIT LICENSE, README per kit SUBMISSION.md, public repo,
-   Devpost by Oct 29.
-4. Optional demo polish ideas surfaced but NOT implemented: URL params for
-   shareable preset links (init state from useSearchParams, Suspense
-   boundary needed), a shuffle/"surprise" button over the catalog, a
-   grounded-vs-generic verdict strip. Do not let these block P5/P6.
+1. **P5 deploy** (biggest hackathon-readiness gap): `deploy/`
+   Dockerfile.backend + Dockerfile.frontend + docker-compose.yml + Caddyfile
+   + smoke_test.sh; AWS t3.micro, plan B Fly.io (IMPLEMENTATION.md §6.1/§6.4).
+   Frontend needs `NEXT_PUBLIC_API_BASE`/`API_BASE` pointed at the public
+   origin (check `frontend/lib/api.ts` + `.env.local`).
+2. **Lighthouse a11y >= 95** on the production build (still open).
+3. **P6 package:** MIT LICENSE, README per kit SUBMISSION.md, public repo,
+   Devpost draft (IMPLEMENTATION.md §8), submit by Oct 29.
+4. Optional demo polish (do not block P5/P6): URL params for shareable
+   preset links; verdict strip "grounded citations vs model guesses";
+   "Surprise me" shuffle over the 9 presets.
 
-## 7. Working session env (end state)
+## 7. Working session env (end state - SERVERS ARE RUNNING)
 
-- **Servers KILLED at session end.** Backend up: from repo root
-  `powershell -ExecutionPolicy Bypass -File backend\serve.ps1`, then
-  `Invoke-WebRequest http://localhost:8000/api/health` + tail
-  `%TEMP%\opencode\uvicorn.err.log` for `Uvicorn running`. Frontend up:
-  `npm run dev` in `frontend/`.
-- Full live smoke: GET /api/health, GET /api/qloo/status (zero cost), then
-  `py -3.12 -u %TEMP%\opencode\live_drive.py` or the browser preset click.
-- Probe scratch: `%TEMP%\opencode\preset_tag_probe.ps1` (12 find_tags),
-  `preset_demo_probe.ps1`, `preset_demo_probe2.ps1`; last full envelope at
-  `%TEMP%\opencode\presets_probe\in.json` + `students_full.json`
-  (college-students needs_input shape).
-- Provider: new-account Groq key (TPD fresh-ish; ~1 live double-run burned
-  ~11-15k this morning + ~33 direct harness probes, no LLM steps - quota is
-  safe). `gemini-3.8-flash` fallback resets ~07:30 UTC.
-- Playwright chromium installed (1248).
+- Backend: :8000, started via `backend\serve.ps1` with the latest code
+  (P4.3); health 200. Restart ONLY via that script (it kills the listener
+  first and asserts the bind in the log).
+- Frontend: `npm run dev` on :3000 (Next hot-reload; picks up frontend
+  edits automatically). Open http://localhost:3000 to demo.
+- To stop: kill the :8000 python pid and the :3000 node pid from
+  `Get-NetTCPConnection -LocalPort <port> -State Listen`.
+- Provider: `LLM_PROVIDER=groq`, `LLM_MODEL=openai/gpt-oss-120b`; this
+  session burned roughly 5 live double-runs + ~35 direct Qloo probes
+  (probes cost no LLM quota); TPD still comfortable. Gemini fallback resets
+  ~07:30 UTC.
+- Playwright chromium installed (1248). Demo driver + screenshots paths
+  in §1; probe scratch in `%TEMP%\opencode\preset_*.ps1`.

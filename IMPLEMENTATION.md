@@ -20,7 +20,7 @@
 | P1 | Integration layer: Python wrapper around `qloo exec` + status normalizer | ✅ done 2026-10-21 | mock tests green (22) + live adapter call ok |
 | P2 | Agent loop: FastAPI ↔ `qloo mcp` stdio, tools, grounding contract, abstain policy, CLI test runner | ✅ done 2026-10-21 | one brief → full concept via CLI |
 | P3 | HTTP layer: FastAPI endpoints + SSE trace + Qloo-off toggle | ✅ done 2026-10-21 | curl-able end to end |
-| P4 | Next.js UI: brief form, side-by-side, trace panel, disambiguation picker | ☒ code complete 2026-10-21 | Lighthouse a11y still open |
+| P4 | Next.js UI: brief form, side-by-side, trace panel, disambiguation picker | ✅ done 2026-10-25 (P4.1 presets 9, P4.2 413 fix, P4.3 minimal tool chain - all live-verified) | Lighthouse a11y still open |
 | P5 | Deploy: EC2 t3.micro + Docker Compose + Caddy + DuckDNS TLS | ☐ | public URL, HTTPS, external smoke test |
 | P6 | Submission package: README, LICENSE, Devpost description, presets | ☐ | **submit by Oct 29** |
 | P7 | Buffer | ☐ | hard deadline Oct 30 11:45pm EDT |
