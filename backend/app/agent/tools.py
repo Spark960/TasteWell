@@ -28,17 +28,16 @@ _MODEL_KEYS = (
 # driver (~150 chars x 10 rows x 3 envelopes); truncate model-facing ones.
 _DESCRIPTION_CAP = 120
 
-# Default LLM-facing tool subset (token budget: the full live surface is
-# ~10.2k chars of schemas; Groq free tier allows 8k tokens/min, so each extra
-# schema costs whole steps/min). This four-tool chain covers the brief:
-# concept -> tags -> recommendations -> catchment. Entity-only tools
-# (entity_tags/audience_demographics/trends/rank/compare_audiences) are
-# excluded because tag URNs cannot feed them and they caused dead-end loops.
+# Default LLM-facing tool subset. Minimal honest chain for the brief:
+# concept -> tags (menu_tilt, tag_themes) -> 2 recommendations (artists for
+# music_programming, brands for adjacent_brands) -> final. Entity-only
+# tools are excluded: they cannot consume tag URNs, produce zero-candidate
+# dead-ends, and detours cost whole 8k-TPM windows (live 2026-10-22: a
+# coffee run took 143s / 6 envelopes and dropped music; the same brief
+# took 51s / 2 envelopes with all sections when the chain was kept short).
 DEFAULT_LLM_TOOLS: tuple[str, ...] = (
     "qloo_find_tags",
-    "qloo_describe",
     "qloo_recommend",
-    "qloo_where_popular",
 )
 
 # Args that require REAL entities (ids or names) — tag URNs are invalid there

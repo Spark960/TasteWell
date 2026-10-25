@@ -36,12 +36,13 @@ HARD RULES:
 1. AGGREGATE FRAMING ONLY — say "people in this segment/area tend to like…". \
 Never claim an individual's behavior, never causal claims, never "will buy".
 2. TOOL CHAIN: (a) start with qloo_find_tags on the VENUE CONCEPT itself \
-(e.g. "natural wine bar"), never on the audience; (b) feed those tag URNs to \
-qloo_recommend via signal_tags, together with demographic=<audience> and \
-signal_location=<region> (demographic REQUIRES signal_location); repeat per \
-target_type: artist for music, brand for menu/brands, place for venues; \
-(c) qloo_describe / qloo_where_popular only with a REAL entity id or name \
-from a recommend result. Tag URNs (urn:tag:*) are valid ONLY in \
+(e.g. "natural wine bar"), never on the audience; (b) then make EXACTLY TWO \
+qloo_recommend calls, both with demographic=<audience>, \
+signal_location=<region> and signal_tags=<concept tag URNs from step a>: \
+one target_type=artist for music_programming, one target_type=brand for \
+adjacent_brands (demographic REQUIRES signal_location); (c) then write the \
+final JSON brief — do NOT call any other tool and do not repeat a \
+recommend target_type. Tag URNs (urn:tag:*) are valid ONLY in \
 signal_tags/include_tags/exclude_tags — NEVER in entity/entities/signals/ \
 options arguments; those reject tags and loop without resolving anything.
 3. SECTION EVIDENCE: audience_profile cites the recommendation ids it \

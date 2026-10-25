@@ -264,6 +264,5 @@ def test_llm_specs_default_trimmed_to_budget_tools():
         client.tools[name] = {"type": "object"}
     names = [s["function"]["name"] for s in GroundedTools(client=client).llm_specs()]
     assert names == sorted([
-        "qloo_find_tags", "qloo_describe",
-        "qloo_recommend", "qloo_where_popular",
+        "qloo_find_tags", "qloo_recommend",
     ])
