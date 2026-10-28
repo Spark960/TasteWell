@@ -24,16 +24,16 @@ There are **two related frontend experiences**:
 
 | Route | Purpose | Current status |
 | --- | --- | --- |
-| **/** | Original concept-brief demo: compare a Qloo-grounded brief with a generic model-only brief. | Implemented; useful for showing what Qloo adds, but runs are not saved as decisions. |
-| **/decision** | Experimental programming-decision workspace: compare artist options across venues, choose a pilot, save evidence and an outcome. | Implemented for an artist-led live-music slice, with meaningful limitations below. |
+| **/** and **/decision** | Primary programming-decision workspace: compare artist options across venues, choose a pilot, save evidence and an outcome. | Implemented for an artist-led live-music slice, with meaningful limitations below. |
+| **/compare** | Secondary concept-brief demo: compare a Qloo-grounded brief with a generic model-only brief. | Implemented; useful for showing what Qloo adds, but runs are not saved as decisions. |
 
-### The original brief demo at /
+### The original brief demo at /compare
 
 The user can choose one of nine quick presets or type a venue concept, region/catchment, and target audience. **Run both panes** starts two backend runs in parallel. The grounded run uses the Qloo harness to resolve a concept tag and find cultural recommendations; the generic run asks the configured language model without Qloo. The page streams progress and a live trace, then displays brief sections such as audience profile, menu tilt, music/programming, adjacent brands, tag themes, and explicit absences. Ambiguous Qloo matches are presented for a user choice, which restarts the relevant run with the selected ID.
 
 This route is a **comparison/demo**. Its runs and trace are held in backend memory and are lost on backend restart. The Stop button aborts browser stream consumption; it does not reliably stop backend work already started.
 
-### The programming-decision workspace at /decision
+### The programming-decision workspace at / and /decision
 
 The form accepts a venue concept, audience, objective, first venue, up to nine additional venues, a live-music permission flag, optional budget ceiling for each venue, and up to five artist names. A four-column CSV can populate 1–10 venue rows in the browser; the file itself is not sent to the server until the user submits the resulting form.
 
@@ -45,13 +45,13 @@ Additional current actions are saved-decision history, JSON export, a labeled re
 
 ## What the frontend looks like today
 
-The app uses a dark charcoal/black theme, light text, thin bordered cards, and restrained amber/teal accents. It is responsive: forms use a two-column layout on wider screens and stack on narrower screens.
+The app uses a curated field-guide visual system: warm paper surfaces, deep green navigation, Newsreader headings, DM Sans controls, and small evidence marks. The decision workspace has a visible four-stage trail. Forms use two columns when space allows and stack on smaller screens.
 
-**Home page (/):** At desktop width, the header says “Tastewell” and links to the programming decision page. A narrow left column contains preset chips, venue concept/region/audience fields, and a teal **Run both panes** button. The wider right column stacks a teal-accented **Grounded** result card, an expandable **Live trace**, and an **Ungrounded** result card. Before a run, both result cards show an empty-state message. A footer explains that Qloo's data concerns aggregate cultural affinity.
+**Comparison page (/compare):** A shared Tastewell header links back to decisions. A brief form with presets sits beside the **Grounded**, expandable **Live trace**, and **Ungrounded** results on wide screens; it stacks above them on smaller screens. Before a run, both result sections show empty states. The footer explains that Qloo's data concerns aggregate cultural affinity.
 
-**Decision page (/decision):** A centered content column begins with the “Programming decision” heading, a link back to the brief demo, and a **Saved decisions** button. A large dark form card holds venue/concept/region/audience/objective/budget inputs, the live-music checkbox, additional-venue controls, CSV picker, artist-shortlist textarea, and an amber **Explore options** button. After a run, the page shows job progress or a resolution chooser, then option cards with titles, descriptions, venue-by-venue artist ranks, unknowns, constraint notes, and expandable Qloo evidence. Lower sections expose scenario comparisons, the pilot-selection form, and the aggregated-outcome form. Replay and JSON export appear beside the saved decision. Errors and unavailable evidence are shown in the page rather than replaced with invented answers.
+**Decision page (/ and /decision):** A shared Tastewell header has navigation and **Saved decisions**. A green decision trail shows the brief, options, plan, and outcome stages beside the main workspace on wide screens and as a compact step row on smaller screens. The brief form holds venue/concept/region/audience/objective/budget inputs, the live-music checkbox, additional-venue controls, CSV picker, artist-shortlist textarea, and **Explore options**. After a run, the page shows progress or a resolution chooser, then option records with source counts, venue-by-venue ranks, unknowns, constraints, and expandable Qloo evidence. Scenario comparison, pilot plan, and aggregated outcome follow below. Replay and JSON export remain beside a saved decision. Errors and unavailable evidence stay visible.
 
-These are descriptions of the current rendered pages at desktop width on 2026-10-28. They are **not** a design mockup of the eventual product. The newer decision workflow still lives at /decision; the older brief demo remains the default / route.
+These describe the local rendered pages on 2026-10-28, including a phone-width check. They are not a claim that the product has been validated with operators.
 
 ## How the frontend connects to the backend
 
@@ -67,7 +67,7 @@ flowchart LR
     Engine --> DB["SQLite decision snapshots"]
 ~~~
 
-**Local development:** The frontend normally runs at http://localhost:3000 and the backend at http://localhost:8000. frontend/.env.local sets NEXT_PUBLIC_API_BASE=http://localhost:8000, so browser fetch calls go to the FastAPI server. FastAPI allows the configured local frontend origin through CORS. The root page's typed client is in frontend/lib/api.ts; the /decision page makes its API requests in frontend/app/decision/page.tsx.
+**Local development:** The frontend normally runs at http://localhost:3000 and the backend at http://localhost:8000. frontend/.env.local sets NEXT_PUBLIC_API_BASE=http://localhost:8000, so browser fetch calls go to the FastAPI server. FastAPI allows the configured local frontend origin through CORS. The comparison demo's typed client is in frontend/lib/api.ts; the primary decision page makes its API requests in frontend/app/decision/page.tsx.
 
 **Private AWS preview:** Caddy fronts both services on one HTTPS origin. It asks for a shared Basic Auth password, routes /api/* to the backend container on port 8000, and routes other paths to the frontend container on port 3000. The frontend build uses an empty API base, so requests stay on that same origin. The backend receives Qloo/model credentials through a private host .env file. The prepared stack is in deploy/compose.yaml and deploy/Caddyfile. A Docker image build and hosted smoke test have not yet been completed.
 
@@ -107,7 +107,7 @@ GET /api/health checks that the API process is alive; it does **not** check Qloo
 | Evaluation | Desk research and synthetic briefs exist, but no operator interviews, buying evidence, or real pilot uplift measurements were collected. |
 | Deployment | A single-host Docker/Caddy package and beginner AWS guide exist. Docker images, hosted Qloo readiness, backups, and an AWS smoke test still need verification. |
 
-The last deterministic backend suite reported **86 passed with 3 live tests deselected**; the frontend production build, lint, and four mocked browser journeys passed. A later local /api/qloo/status check returned **harness spawn timeout**. Treat that as an environment readiness issue to resolve before calling a live pilot usable. The local health endpoint alone does not prove Qloo integration is ready.
+The last deterministic backend suite reported **86 passed with 3 live tests deselected**. After the visual redesign, the frontend production build and lint passed, and **seven mocked browser journeys passed with two live journeys skipped**. A local /api/qloo/status check previously returned **harness spawn timeout**. Treat that as an environment readiness issue to resolve before calling a live pilot usable. The local health endpoint alone does not prove Qloo integration is ready.
 
 ## Key files
 

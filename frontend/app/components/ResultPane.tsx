@@ -176,7 +176,7 @@ export function ResultPane({
   return (
     <section
       aria-label={`${title} result`}
-      className={`flex min-h-0 flex-col rounded-xl border p-4 ${
+      className={`compare-pane flex min-h-0 flex-col rounded-xl border p-4 ${
         grounded
           ? "border-teal-500/30 bg-teal-500/[0.03]"
           : "border-zinc-800 bg-zinc-900/40"

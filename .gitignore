@@ -33,9 +33,12 @@ probe/inputs/
 *.trace.json
 trace.json
 dev.log
+debug.log
 logs/
 backend/data/
 graphify-out/
+.impeccable/
+.impeccable-cache/
 
 # os / editor
 .DS_Store

@@ -1,10 +1,10 @@
 # Tastewell
 
 Tastewell helps a venue operator choose a programming pilot across one or
-more venues. The experimental workspace at `/decision` resolves a concept
+more venues. The primary workspace at `/` (also available at `/decision`) resolves a concept
 and artist shortlist with Qloo, compares the same artist IDs per venue,
 shows inspectable evidence, and saves the selected pilot and outcome. The
-older `/` demo still generates a Qloo-grounded concept brief beside a
+secondary `/compare` demo still generates a Qloo-grounded concept brief beside a
 generic LLM-only brief.
 
 ## Why Qloo
@@ -95,8 +95,8 @@ hackathon host configured in `.env.example`.
    npm run dev
    ```
 
-Open <http://localhost:3000/decision> for the decision workspace or
-<http://localhost:3000> for the brief demo. The backend health check is
+Open <http://localhost:3000> for the decision workspace or
+<http://localhost:3000/compare> for the brief demo. The backend health check is
 <http://localhost:8000/api/health>.
 
 ## API and development

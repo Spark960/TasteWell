@@ -1,18 +1,29 @@
 @import "tailwindcss";
 
-body {
-  font-family: ui-sans-serif, system-ui, sans-serif;
+:root {
+  color-scheme: light;
+  --paper: #f7f5ef;
+  --paper-deep: #eeeae0;
+  --ink: #1f2d29;
+  --muted: #596b63;
+  --forest: #163c34;
+  --forest-dark: #0e2b26;
+  --coral: #cf684e;
+  --line: #d6d9d0;
+  --sage: #dce8db;
 }
-
-/* thin scrollbar for trace + pane scrollers */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-thumb {
-  background: oklch(0.35 0 0);
-  border-radius: 4px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--paper); color: var(--ink); font-family: "DM Sans", sans-serif; -webkit-font-smoothing: antialiased; }
+button, input, textarea, select { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+::selection { background: #bad6c5; color: var(--forest-dark); }
+:focus-visible { outline: 3px solid var(--coral); outline-offset: 3px; }
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb { background: #a8b8ad; border: 2px solid var(--paper); border-radius: 9px; }
+::-webkit-scrollbar-track { background: var(--paper); }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }

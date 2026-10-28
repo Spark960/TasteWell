@@ -83,7 +83,7 @@ export function BriefForm({
   return (
     <form
       aria-label="Venue brief"
-      className="space-y-3"
+      className="compare-brief-form space-y-3"
       onSubmit={(e) => {
         e.preventDefault();
         if (valid && !running) onRun({ brief, region, audience });

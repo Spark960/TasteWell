@@ -14,6 +14,7 @@ import {
 import { BriefForm } from "./components/BriefForm";
 import { ResultPane } from "./components/ResultPane";
 import { TracePanel } from "./components/TracePanel";
+import "./compare/compare.css";
 
 type Phase =
   | "idle"
@@ -170,23 +171,19 @@ export default function TastewellApp() {
   );
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 py-6">
-      <header className="mb-6">
-        <Link href="/decision" className="float-right rounded-md border border-amber-400 px-3 py-2 text-sm text-amber-300">Try programming decision</Link>
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-50">
-          Tastewell
-        </h1>
-        <p className="text-sm text-zinc-400">
-          Tells a venue what the people around it actually like.
-        </p>
+    <div className="compare-shell">
+      <header className="compare-topbar">
+        <Link href="/" className="decision-brand" aria-label="Tastewell home"><span className="decision-brand-mark">t<span>.</span></span><span>tastewell</span></Link>
+        <nav aria-label="Main navigation"><Link href="/">Decisions</Link><Link href="/compare" aria-current="page">Compare Qloo</Link></nav>
       </header>
-
-      <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-[300px_1fr]">
-        <aside className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
+      <div className="compare-content">
+        <div className="compare-intro"><h1>See what culture adds.</h1><p>Run one venue brief two ways: with Qloo&apos;s aggregate taste signals, and with the model alone. Inspect where the answers come from.</p></div>
+        <div className="compare-workspace">
+        <aside className="compare-form-panel">
+          <h2>Build a quick brief</h2><p>Choose a starting point or describe your own venue.</p>
           <BriefForm running={running} onRun={runBoth} onCancel={cancel} />
         </aside>
-
-        <main className="grid min-h-0 gap-5 lg:grid-rows-[minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,0.8fr)]">
+        <main className="compare-results">
           <ResultPane
             mode="grounded"
             phase={grounded.phase}
@@ -212,11 +209,9 @@ export default function TastewellApp() {
             onPick={(c) => reDrive("generic", c)}
           />
         </main>
+        </div>
+        <footer className="compare-footer">{DISCLAIMER}</footer>
       </div>
-
-      <footer className="mt-4 text-center text-[11px] text-zinc-500">
-        {DISCLAIMER}
-      </footer>
     </div>
   );
 }

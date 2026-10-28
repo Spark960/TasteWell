@@ -100,7 +100,7 @@ export function TracePanel({
 
   return (
     <section
-      className="rounded-xl border border-zinc-800 bg-zinc-900/40"
+      className="compare-trace rounded-xl border border-zinc-800 bg-zinc-900/40"
       aria-label="Live trace panel"
     >
       <button

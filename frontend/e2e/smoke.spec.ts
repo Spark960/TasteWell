@@ -138,7 +138,7 @@ test.describe("tastewell smoke (mocked backend)", () => {
   });
 
   test("preset click → both panes render; trace shows tool rows", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/compare");
     await page
       .getByRole("button", { name: "Wine bar" })
       .click();
@@ -165,7 +165,7 @@ test.describe("tastewell smoke (mocked backend)", () => {
   });
 
   test("needs_input → picker → pick re-drives grounded pane to done", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/compare");
     await page
       .getByRole("button", { name: "Listening bar" })
       .click();
@@ -186,18 +186,20 @@ test.describe("tastewell smoke (mocked backend)", () => {
   });
 
   test("trace panel lists tool rows with status chips", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/compare");
     await page
       .getByRole("button", { name: "Tacos" })
       .click();
     await page.getByRole("button", { name: "Run both panes" }).click();
 
     const traceToggle = page.getByRole("button", { name: /Live trace/ });
+    await expect(page.getByRole("dialog", { name: "Disambiguation picker" })).toBeVisible();
     await expect(traceToggle).toContainText("events");
     // panel auto-opens once events exist; only click if it isn't open already
     if ((await traceToggle.getAttribute("aria-expanded")) !== "true") {
       await traceToggle.click();
     }
+    await expect(traceToggle).toHaveAttribute("aria-expanded", "true");
     await page.getByRole("button", { name: "tools", exact: true }).click();
     await expect(page.getByText("qloo_describe").first()).toBeVisible();
     // needs_input status chip color-coded in the trace

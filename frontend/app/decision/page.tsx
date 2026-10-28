@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { API_BASE } from "@/lib/api";
 import { parseVenueCsv } from "./venueCsv";
+import "./decision.css";
 
 type Evidence = {
   id: string; operation: string; status: string; source_id: string | null;
@@ -280,14 +281,37 @@ export default function DecisionPage() {
   const scenarioVenue = decision?.venues.find((venue) => venue.id === scenarioInput.venue_id)
     ?? decision?.venues.find((venue) => venue.live_music_allowed);
 
-  return <div className="mx-auto min-h-screen max-w-5xl px-4 py-8 text-zinc-100">
-    <header className="mb-8 flex items-start justify-between gap-4">
-      <div><h1 className="text-3xl font-semibold">Programming decision</h1>
-        <p className="mt-2 max-w-2xl text-sm text-zinc-400">Explore a small pilot shortlist with Qloo evidence. You choose the venue concept and final option; booking costs and availability still need checking.</p></div>
-      <Link href="/" className="text-sm text-zinc-300 underline">Current brief demo</Link>
+  return <div className="decision-shell">
+    <header className="decision-topbar">
+      <Link href="/" className="decision-brand" aria-label="Tastewell home"><span className="decision-brand-mark">t<span>.</span></span><span>tastewell</span></Link>
+      <nav className="decision-nav" aria-label="Main navigation">
+        <Link href="/" aria-current="page">Decisions</Link>
+        <Link href="/compare">Compare Qloo</Link>
+      </nav>
+      <button onClick={() => void loadHistory()} className="decision-history-button">Saved decisions</button>
     </header>
-    <button onClick={() => void loadHistory()} className="mb-4 rounded-md border border-zinc-600 px-3 py-2 text-sm">Saved decisions</button>
-    {historyOpen && <section className="mb-5 rounded-xl border border-zinc-700 bg-zinc-900 p-4">
+    <div className="decision-layout">
+    <aside className="decision-rail" aria-label="Decision guide">
+      <div className="decision-rail-inner">
+        <p className="decision-rail-label">Your decision trail</p>
+        <h2>Better nights start with better questions.</h2>
+        <p className="decision-rail-copy">Build a small, evidence-backed shortlist. Then choose a room, name the unknowns, and record what actually happened.</p>
+        <ol className="decision-steps">
+          <li className="is-active"><span>1</span><div><strong>Set the brief</strong><small>Rooms, audience &amp; limits</small></div></li>
+          <li className={decision?.options.length ? "is-active" : ""}><span>2</span><div><strong>Explore options</strong><small>Ranks &amp; source evidence</small></div></li>
+          <li className={decision?.selected_option_id ? "is-active" : ""}><span>3</span><div><strong>Plan the pilot</strong><small>Owner, timing &amp; measure</small></div></li>
+          <li className={decision?.outcome ? "is-active" : ""}><span>4</span><div><strong>Record the outcome</strong><small>What your own data shows</small></div></li>
+        </ol>
+        <div className="decision-rail-note"><strong>What Qloo brings</strong><p>Aggregate cultural signals to compare a shortlist. Availability, costs, and results stay with your team.</p></div>
+      </div>
+    </aside>
+    <main className="decision-main">
+    <section className="decision-intro">
+      <h1>Make the next night count.</h1>
+      <p>Find an artist-led pilot that fits your audience and your venues. Keep the evidence and the operational questions together as you decide.</p>
+      <div className="decision-scope"><span className="decision-scope-dot" />Currently exploring <strong>live music</strong> <span aria-hidden="true">·</span> Up to 10 venues</div>
+    </section>
+    {historyOpen && <section className="decision-history mb-5 rounded-xl border border-zinc-700 bg-zinc-900 p-4">
       <h2 className="font-semibold">Recent decisions</h2>
       {history.length === 0 && <p className="mt-2 text-sm text-zinc-400">No decisions saved yet.</p>}
       <div className="mt-3 grid gap-2">{history.map((item) =>
@@ -296,7 +320,8 @@ export default function DecisionPage() {
           {item.venue_name} · {item.concept} · {item.region}
           <span className="block text-xs text-zinc-500">{item.source_mode === "replay" ? "Replay · " : ""}{item.has_outcome ? "Outcome recorded" : item.selected_option_id ? "Pilot selected" : item.status} · {item.updated_at}</span>
         </button>)}</div></section>}
-    <form onSubmit={(event) => { event.preventDefault(); void create(); }} className="rounded-xl border border-zinc-700 bg-zinc-900 p-5">
+    <form id="decision-brief" onSubmit={(event) => { event.preventDefault(); void create(); }} className="decision-form rounded-xl border border-zinc-700 bg-zinc-900 p-5">
+      <div className="decision-form-heading"><div><h2>Shape your pilot brief</h2><p>Start with the venue and the people you want to reach.</p></div><span>01 / Brief</span></div>
       <div className="grid gap-4 sm:grid-cols-2">{fields.map(({ key, label, placeholder }) =>
         <label key={key} className="text-sm text-zinc-300">{label}
           <input required={key !== "budget_limit"} type={key === "budget_limit" ? "number" : "text"}
@@ -306,7 +331,7 @@ export default function DecisionPage() {
         </label>)}</div>
       <label className="mt-4 flex items-center gap-2 text-sm"><input type="checkbox" checked={form.live_music_allowed}
         onChange={(event) => setForm({ ...form, live_music_allowed: event.target.checked })} />Live music is permitted at this venue</label>
-      <div className="mt-5 border-t border-zinc-700 pt-4">
+      <div className="decision-venues mt-5 border-t border-zinc-700 pt-4">
         <div className="flex items-center justify-between gap-3"><h2 className="font-medium">Additional venues</h2>
           <button type="button" disabled={extraVenues.length >= 9} onClick={() => setExtraVenues([...extraVenues,
             { name: "", region: "", live_music_allowed: true, budget_limit: "" }])}
@@ -332,18 +357,18 @@ export default function DecisionPage() {
             className="text-left text-xs text-zinc-400 underline">Remove venue</button>
         </div>)}
       </div>
-      <label className="mt-5 block text-sm text-zinc-300">Your artist shortlist (optional; one name per line, up to five)
+      <label className="decision-shortlist mt-5 block text-sm text-zinc-300">Your artist shortlist (optional; one name per line, up to five)
         <textarea rows={3} value={artistShortlist} onChange={(event) => setArtistShortlist(event.target.value)}
           placeholder={"Miles Davis\nAnother act you are considering"}
           className="mt-1 block w-full rounded-md border border-zinc-600 bg-zinc-950 p-2 text-zinc-100" />
       </label>
-      <button disabled={busy} className="mt-5 rounded-md bg-amber-400 px-4 py-2 font-semibold text-zinc-950 disabled:opacity-50">{busy ? "Checking Qloo…" : "Explore options"}</button>
+      <button disabled={busy} className="decision-primary mt-5 rounded-md bg-amber-400 px-4 py-2 font-semibold text-zinc-950 disabled:opacity-50">{busy ? "Checking Qloo…" : "Explore options"}</button>
       {jobId && <button type="button" onClick={() => void cancelCreate()}
         className="ml-3 rounded-md border border-zinc-600 px-4 py-2 text-sm">Cancel decision</button>}
       {jobStage && <p role="status" className="mt-2 text-xs text-zinc-400">{jobStage}</p>}
     </form>
     {error && <p role="alert" className="mt-5 rounded-md border border-red-700 p-3 text-red-300">{error}</p>}
-    {decision && <section className="mt-8" aria-live="polite">
+    {decision && <section id="decision-options" className="decision-results mt-8" aria-live="polite">
       <h2 className="text-xl font-semibold">{decision.status === "ready" ? "Pilot options" : "Decision needs attention"}</h2>
       <p className="mt-1 text-xs text-zinc-500">Decision {decision.id} · {decision.source_mode === "replay"
         ? `Replay of ${decision.replay_of}; no new Qloo call` : "Current decision"} · Saved on this server.</p>
@@ -363,8 +388,9 @@ export default function DecisionPage() {
             className="rounded-md border border-zinc-600 px-3 py-2 text-left text-sm hover:border-amber-400">
             {candidate.name || candidate.id}<span className="block text-xs text-zinc-500">{candidate.type}</span></button>)}</div>
       </div>}
-      <div className="mt-5 grid gap-4 md:grid-cols-3">{decision.options.map((option) =>
-        <article key={option.id} className="rounded-xl border border-zinc-700 bg-zinc-900 p-4">
+      <div className="decision-options-grid mt-5 grid gap-4 md:grid-cols-3">{decision.options.map((option, index) =>
+        <article key={option.id} className="decision-option rounded-xl border border-zinc-700 bg-zinc-900 p-4">
+          <div className="decision-option-top"><span>Option {String(index + 1).padStart(2, "0")}</span><span>{option.evidence_ids.length} sources</span></div>
           <h3 className="font-semibold">{option.title}</h3><p className="mt-2 text-sm">{option.description}</p>
           {option.artist_rank && <p className="mt-2 text-xs text-amber-300">Artist #{option.artist_rank} within this Qloo shortlist</p>}
           {decision.venues.length > 1 && <div className="mt-3 border-t border-zinc-700 pt-3 text-xs">
@@ -388,7 +414,7 @@ export default function DecisionPage() {
             {decision.selected_option_id === option.id ? "Selected · edit plan" : "Plan this pilot"}</button>
         </article>)}</div>
       {decision.status === "ready" && decision.options.some((option) => option.artist_rank) &&
-        <section className="mt-6 rounded-xl border border-zinc-700 bg-zinc-900 p-5">
+        <section className="decision-scenario mt-6 rounded-xl border border-zinc-700 bg-zinc-900 p-5">
           <h3 className="font-semibold">Scenario comparison</h3>
           <p className="mt-1 text-sm text-zinc-400">Keep the artist IDs fixed and change one audience or region. Each rank is within its own Qloo call.</p>
           <form onSubmit={(event) => { event.preventDefault(); void compareScenario(); }}
@@ -436,7 +462,7 @@ export default function DecisionPage() {
             </div>)}
         </section>}
       {pendingOption && <form onSubmit={(event) => { event.preventDefault(); void select(pendingOption); }}
-        className="mt-6 rounded-xl border border-amber-700 bg-zinc-900 p-5">
+        className="decision-plan mt-6 rounded-xl border border-amber-700 bg-zinc-900 p-5">
         <h3 className="text-lg font-semibold">Record the pilot</h3>
         <p className="mt-1 text-sm text-zinc-400">Use your own operational facts. Qloo does not provide booking, cost, or outcome data.</p>
         <label className="mt-4 block text-sm">Pilot venue
@@ -468,7 +494,7 @@ export default function DecisionPage() {
       </form>}
       {decision.selected_option_id && <p className="mt-5 rounded-md border border-green-700 p-3 text-sm text-green-300">
         Selection recorded for {decision.venues.find((venue) => venue.id === decision.pilot_plan?.venue_id)?.name} on {decision.pilot_plan?.target_date}. Owner: {decision.pilot_plan?.owner}. Next: {decision.pilot_plan?.next_action}.</p>}
-      {decision.selected_option_id && <div className="mt-5 rounded-xl border border-zinc-700 bg-zinc-900 p-5">
+      {decision.selected_option_id && <div className="decision-outcome mt-5 rounded-xl border border-zinc-700 bg-zinc-900 p-5">
         <h3 className="font-semibold">Pilot outcome</h3>
         <p className="mt-1 text-sm text-zinc-400">Enter aggregated results from your own records. A difference from baseline does not establish that this program caused it.</p>
         {decision.outcome && <p className="mt-3 text-sm text-green-300">Recorded: {decision.outcome.metric} {decision.outcome.baseline_value} → {decision.outcome.actual_value} {decision.outcome.unit} ({decision.outcome.period}). Source: {decision.outcome.source}.</p>}
@@ -488,6 +514,8 @@ export default function DecisionPage() {
         </form>
       </div>}
     </section>}
-    <footer className="mt-10 text-xs text-zinc-500">Qloo reports aggregate cultural affinity. It does not predict attendance, sales, or individual behavior.</footer>
+    <footer className="decision-footer mt-10 text-xs text-zinc-500">Qloo reports aggregate cultural affinity. It does not predict attendance, sales, or individual behavior.</footer>
+    </main>
+    </div>
   </div>;
 }
