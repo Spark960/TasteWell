@@ -1,0 +1,13 @@
+.git
+.codex
+.env
+**/.env.local
+**/.venv
+**/node_modules
+**/.next
+**/__pycache__
+**/.pytest_cache
+**/test-results
+backend/data
+graphify-out
+

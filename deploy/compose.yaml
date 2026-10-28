@@ -1,0 +1,45 @@
+name: tastewell
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.backend
+    env_file:
+      - ../.env
+    environment:
+      APP_ENV: production
+      QLOO_BIN: qloo
+    volumes:
+      - decision_data:/app/backend/data
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.frontend
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.10
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+      ACCESS_USER: ${ACCESS_USER:?Set ACCESS_USER in the shell}
+      ACCESS_PASSWORD_HASH: ${ACCESS_PASSWORD_HASH:?Set ACCESS_PASSWORD_HASH in the shell}
+    ports:
+      - "${HTTP_BIND:-127.0.0.1}:${HTTP_PORT:-8080}:80"
+      - "${HTTPS_BIND:-127.0.0.1}:${HTTPS_PORT:-8443}:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+
+volumes:
+  decision_data:
+  caddy_data:
+  caddy_config:
+

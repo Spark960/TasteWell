@@ -118,6 +118,16 @@ Raw outputs: `probe/out/<operation>.<variant>.json`.
   option_type, signals?, signal_location?, demographic?, include_tags?,
   exclude_tags?}` — **one shared options set per call; scores from separate
   calls are not comparable** (harness prompt guideline).
+- Decision-slice probe (2026-10-27, live MCP): three artist UUIDs returned by
+  `recommend` for jazz/Brooklyn/millennials were sent together to `rank` with
+  `option_type:"artist"`, `signal_location:"Brooklyn, New York"`, and
+  `demographic:"millennials"`. Status was `ok`; all three IDs returned with
+  affinity values and a different order from the discovery call. This is a
+  valid **within-call** artist shortlist comparison. Adding
+  `include_tags:["urn:tag:genre:music:jazz"]` to the same rank query returned
+  only one of the three options, so that field acts as a filter here and
+  cannot be used when the UI promises a comparison of the full set. The
+  harness schema allows `include_tags` but not `signal_tags` for `rank`.
 - live call: 3 coffee brands + Brooklyn + millennials → ok, count 3, per
   result `{entity_id, name, type, subtype?, popularity, affinity}` sorted by
   affinity (Blue Bottle 0.963 > Intelligentsia 0.917 > Stumptown 0.881).

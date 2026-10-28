@@ -104,6 +104,7 @@ _SCHEMA_NUDGE = (
 class Reply:
     content: str = ""
     tool_calls: list[dict] = field(default_factory=list)  # {id, name, args: dict}
+    finish_reason: str = ""
     # Gemini 3.x requires its `extra_content.google.thought_signature` to be
     # echoed back verbatim (message- and tool_call-level) or the next call
     # 400s with "Function call is missing a thought_signature".
@@ -274,13 +275,15 @@ class LlmProvider:
 
     def _extract(self, data: dict) -> Reply:
         try:
-            msg = data["choices"][0]["message"]
+            choice = data["choices"][0]
+            msg = choice["message"]
         except (KeyError, IndexError) as exc:
             raise RuntimeError(
                 f"LLM response missing choices[0].message: "
                 f"{redact(json.dumps(data)[:300])}"
             ) from exc
         reply = Reply(content=msg.get("content") or "",
+                      finish_reason=choice.get("finish_reason") or "",
                       extra_content=msg.get("extra_content"))
         for tc in msg.get("tool_calls") or []:
             fn = tc.get("function", {})

@@ -175,3 +175,47 @@ async def test_dns_error_retried_despite_nonretryable_flag():
         res = await c.call_tool("find_tags", {"query": "jazz"})
     assert res.status == "ok"
     assert len(session.calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_identical_safe_requests_reuse_one_mcp_result():
+    session = FakeSession([OK_FIND_TAGS])
+    async with client_with(session) as client:
+        first = await client.call_tool("find_tags", {"query": "jazz", "limit": 2})
+        first.results[0]["name"] = "changed by caller"
+        second = await client.call_tool("find_tags", {"limit": 2, "query": "jazz",
+                                                       "semantic": None})
+    assert len(session.calls) == 1
+    assert second.results[0]["name"] == "Jazz"
+    assert second.retrieved_at == first.retrieved_at
+
+
+@pytest.mark.asyncio
+async def test_cache_expires_and_never_reuses_error(monkeypatch):
+    clock = [100.0]
+    monkeypatch.setattr("app.qloo.mcp_client.time.monotonic", lambda: clock[0])
+    session = FakeSession([OK_FIND_TAGS, OK_FIND_TAGS])
+    async with client_with(session, cache_ttl=5) as client:
+        await client.call_tool("find_tags", {"query": "jazz"})
+        clock[0] = 106.0
+        await client.call_tool("find_tags", {"query": "jazz"})
+    assert len(session.calls) == 2
+
+    error = {"error": {"code": "TOOL_INPUT", "retryable": False},
+             "operation": "find_tags"}
+    session = FakeSession([error, OK_FIND_TAGS])
+    async with client_with(session) as client:
+        assert (await client.call_tool("find_tags", {"query": "jazz"})).status == "error"
+        assert (await client.call_tool("find_tags", {"query": "jazz"})).status == "ok"
+    assert len(session.calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_cache_isolated_by_client_session():
+    first_session = FakeSession([OK_FIND_TAGS])
+    second_session = FakeSession([OK_FIND_TAGS])
+    async with client_with(first_session) as first:
+        await first.call_tool("find_tags", {"query": "jazz"})
+    async with client_with(second_session) as second:
+        await second.call_tool("find_tags", {"query": "jazz"})
+    assert len(first_session.calls) == len(second_session.calls) == 1

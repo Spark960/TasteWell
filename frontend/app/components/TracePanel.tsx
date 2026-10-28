@@ -22,6 +22,8 @@ function EventRow({
       case "run_started":
         return `brief: ${ev.brief ?? ""} · region: ${ev.region || "—"} · audience: ${ev.audience || "—"}`;
       case "status":
+        if (ev.message === "connecting_qloo_mcp") return "connecting to Qloo…";
+        if (ev.message === "readiness_ok") return "Qloo connected";
         return String(ev.message ?? "");
       case "llm":
         return `step ${ev.step}${(ev.tool_calls as string[] | undefined)?.length ? ` → ${(ev.tool_calls as string[]).join(", ")}` : " → final"}`;

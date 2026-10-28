@@ -14,6 +14,7 @@ Live-verified shapes (docs/qloo-contract.md):
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 STATUSES = ("ok", "empty", "needs_input", "partial", "degraded", "error")
 
@@ -22,6 +23,7 @@ STATUSES = ("ok", "empty", "needs_input", "partial", "degraded", "error")
 class NormalizedResult:
     status: str
     operation: str
+    retrieved_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     results: list[dict] = field(default_factory=list)
     result_count: int | None = None
     summary: str | None = None

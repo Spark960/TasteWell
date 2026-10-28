@@ -34,6 +34,8 @@ probe/inputs/
 trace.json
 dev.log
 logs/
+backend/data/
+graphify-out/
 
 # os / editor
 .DS_Store

@@ -1,9 +1,312 @@
-# HANDOFF - fresh session (2026-10-27, session ended by user)
+# Tastewell handoff for the next chat (2026-10-27)
 
-> Start here. `IMPLEMENTATION.md` remains the deep source of truth.
-> Tree is clean as of commit `6f6d58d` except this handoff edit.
-> **Servers were left RUNNING at session end (backend :8000 on OpenRouter,
-> frontend :3000). Verify before assuming.**
+## 2026-10-28 deployment decision
+
+The user wants AWS. For a first password-protected private preview, the
+recommended target is an Ubuntu Lightsail 4 GB instance (AWS lists $24/month)
+with a static IP and a domain. `deploy/README.md` now has the AWS steps and
+current pricing links. The local Docker daemon is stopped, and an AWS STS
+identity check found no usable credentials. No AWS resource has been created
+and no hosted smoke test has run. Do not claim public deployment. The user
+still needs to provide account access, preferred AWS region/domain, and
+approval for paid provisioning. `docs/VALIDATION.md` now records why the
+three synthetic benchmarks still fail their gate despite working slices.
+
+## Newest continuation — scenario and cancellable jobs
+
+Additional work after the live job check:
+
+- Added decision JSON export and replay. Replay copies a saved evidence
+  snapshot into a new labeled decision, clears the pilot selection/outcome,
+  and makes no Qloo call. The backend test verifies identical evidence and
+  no extra client calls; the browser test verifies the replay label.
+- Prepared `deploy/` with backend/Next.js images, Caddy same-origin routing
+  and Basic Auth, Compose volumes for SQLite, and a private-preview smoke
+  script. `docker compose config --quiet` passed. The Docker daemon was not
+  running, so images and a hosted smoke test remain unverified. The package
+  is intentionally a single-password preview; it is not multi-user
+  ownership/authentication.
+- Latest suite: **87 passed, 2 skipped**; three mocked browser journeys,
+  production frontend build, and lint passed. The live Qloo job+scenario
+  journey passed before the replay/deploy additions.
+
+- The `/decision` workspace now compares a saved artist shortlist under a
+  changed audience or region for one venue. It reruns `rank` with the same
+  artist IDs, stores both query contexts and source rows in the SQLite
+  decision, and displays ordinal movement without subtracting affinity
+  values across calls. The new API is
+  `POST /api/decisions/{id}/scenarios`.
+- Decision creation and ambiguity resolution now use background jobs with
+  stage/elapsed polling and a Cancel button. The backend cancels the task;
+  each decision has a 180-second total budget including MCP startup and
+  data calls. Existing synchronous endpoints still work. Job status is
+  in-memory, while completed decisions remain in SQLite.
+- The new scenario journey passed live Qloo browser verification. It kept
+  the same two public artist IDs when changing the audience from millennials
+  to young professionals. The subsequent live run through the new job API
+  passed as well. Exact-name test decisions were removed from SQLite after
+  each run. The current backend process was started with the job code.
+- The targeted decision API suite passed 15 tests, three mocked Playwright
+  journeys passed, and frontend lint/build passed. Run the full backend
+  suite and `graphify update .` after further edits.
+- `docs/VALIDATION.md` now has cited published proxy evidence from the
+  National Restaurant Association and SevenRooms. The user has no operator
+  contacts and asked for online research; the interviews, willingness to
+  pay, pilot review, and real outcome gate remain unverified.
+
+Next implementation gaps: fixture replay/export, stronger operational hard
+constraints and candidate revision, persistence/ownership rules and auth,
+evaluation over benchmark decisions, and production deployment. Avoid
+claiming Phase 0 buyer validation or product impact from the proxy sources.
+
+## Latest continuation — 2026-10-27
+
+- Verified the artist-shortlist and multi-venue journey live in the browser
+  with two public jazz artists and two eligible venues. Qloo returned both
+  artist IDs in each venue's `rank` call, and the UI displayed ranks per
+  venue. The ambiguous concept tag was selected by a human-facing chooser.
+  The one exact-name live test decision was removed from SQLite afterward.
+- Added HTTP coverage for artist ambiguity resolution, ID verification, and
+  preserving the decision ID. Added a mocked browser journey for the
+  shortlist, three-venue constraints, artist chooser, per-venue matrix, and
+  pilot selection. Updated the live browser test to exercise the new path.
+- Added a per-MCP-session, five-minute cache for identical successful/empty
+  requests, with per-key locking, a 128-entry cap, and no caching of errors
+  or degraded results. Evidence rows preserve the original retrieval time on
+  cache hits. This cache does not persist across decision resolution HTTP
+  requests because those create a fresh MCP session.
+- Updated `docs/CURRENT_FUNCTIONALITY.md` to describe the current workspace,
+  SQLite persistence, local-only access limit, and verification.
+- Latest checks: backend **84 passed, 2 skipped**; frontend lint and
+  production build passed; two mocked Playwright tests passed; one live Qloo
+  Playwright test passed. Graphify was updated to 715 nodes and 1,662 edges;
+  the backend was restarted on :8000 after the cache change. Run
+  `graphify update .` after any further code edits.
+
+Next: continue the product plan, especially bounded total decision time and
+cancellation, fixture replay, stronger constraints and scenario comparison.
+The Phase 0 buyer gate still needs real operator interviews; no customer
+validation has occurred.
+
+## Active checkpoint — resume the product build here
+
+The user asked to **build the product in `docs/PRODUCT_IMPLEMENTATION_PLAN.md`**
+and test Graphify and Qloo properly. They then asked for this handoff because
+limits are low. Continue the product build; the work below is a working local
+product path, **not the finished plan**. Preserve all uncommitted work.
+
+### What was bduilt in this continuation
+
+- `frontend/app/decision/page.tsx` is a programming-decision workspace linked
+  from the legacy brief home page. It accepts a venue concept, audience,
+  objective, first venue and additional venues with live-music and budget
+  constraints, plus up to five operator-supplied artist names. It displays
+  Qloo-backed option cards, the per-venue rank matrix, evidence drawers,
+  unknowns, a pilot selection form, saved decisions, and an aggregated
+  outcome form. The old dual-pane brief remains at `/`.
+- `backend/app/api/decisions.py` defines typed decision, venue, option,
+  evidence, plan, and outcome models. The deterministic path resolves a Qloo
+  concept tag; asks for a human choice on ambiguity; discovers artists or
+  resolves the operator's artist names with `describe`; obtains an optional
+  brand suggestion; ranks the **same artist ID set in one call per eligible
+  venue**; and constructs up to three distinct pilot formats. Every named
+  Qloo candidate on a card has a ledger ID. Artist availability, fee,
+  staffing, licensing, attendance, and revenue remain unknown.
+- `backend/app/api/engine.py`, `routes.py`, and `decision_store.py` expose
+  create, resolve, list, get, select, and outcome routes. Resolving an
+  ambiguous candidate updates the same decision ID. SQLite snapshots at
+  `backend/data/decisions.sqlite` survive a restart; that directory is
+  gitignored. Decision history has **no authentication yet**, so keep this a
+  local development product until access control is added.
+- `backend/serve.ps1` now prefers `backend/.venv/Scripts/python.exe` and
+  discovers the installed Qloo harness at the user's npm global path.
+  `frontend/app/layout.tsx` uses a system font stack so builds work offline.
+- `docs/VALIDATION.md` holds buyer hypotheses and benchmark decisions.
+  `docs/qloo-contract.md` now records the live `rank` probe: three artist
+  IDs returned together without `include_tags`; adding the jazz tag as an
+  `include_tags` filter returned only one and is unsuitable for a full-set
+  comparison.
+
+### Verification performed
+
+- Graphify works when the command has access to its installed uv runtime.
+  `graphify query ...` succeeded, and `graphify update .` succeeded after
+  edits: **701 nodes, 1,630 edges**. Continue obeying `AGENTS.md`: query
+  Graphify before raw code search/read, update after code changes.
+- Local Python 3.12 venv at `backend/.venv` was created with `uv`; backend
+  dev dependencies installed. Latest full suite: **80 passed, 2 skipped**
+  (`backend/.venv/Scripts/python.exe -m pytest -q`).
+- Qloo harness reported `Qloo data: ready (environment)` with `.env` loaded.
+  Three marked live Qloo tests passed before the final shortlist addition.
+  A live MCP `rank` probe and a live `describe("Miles Davis", type="artist")`
+  probe succeeded. A real browser run from `/decision` through Qloo evidence
+  passed before the artist-shortlist and multi-venue edits. Live test records
+  named `Tastewell live test room` were removed from SQLite afterward.
+- Latest frontend production build, lint, and mocked Playwright decision
+  journey passed after the shortlist and multi-venue edits. The mocked
+  browser journey covers tag resolution, evidence, pilot plan, outcome, and
+  reopening a saved decision.
+
+### In flight / first next actions
+
+1. **Verify the newest artist-shortlist and multi-venue path live.** The
+   backend server at `:8000` was started before the final edits, so restart
+   it with `backend/serve.ps1` first. Frontend dev server at `:3000` was
+   running at handoff; check listeners. Use an operator-safe public artist
+   example, confirm `describe` resolution, full-set `rank` for each venue,
+   and a human ambiguity choice. Keep Qloo probes bounded and sequential.
+2. Add an HTTP test for **artist** ambiguity resolution (tag resolution is
+   already tested), and a browser test for the multi-venue/shortlist form.
+   Investigate any live response differences before expanding stages.
+3. Update `docs/CURRENT_FUNCTIONALITY.md`: its experimental-path paragraph
+   still describes the older one-venue, in-memory slice. Keep plan claims
+   aligned with implemented behavior.
+4. Continue `docs/PRODUCT_IMPLEMENTATION_PLAN.md` in order. The current
+   slice still needs a validated operator shortlist/decision, better hard
+   constraints and scenario comparison, run-level MCP caching, bounded total
+   time/cancellation, evidence replay, authentication, and a production
+   deployment. The geographic map remains optional behind its Qloo semantics
+   gate. No operator interviews have occurred, so Phase 0's buyer gate is
+   **not** passed; do not claim customer validation or sales impact.
+
+### Operational notes
+
+- The Qloo global `qloo.cmd` is at
+  `C:\Users\parsa\AppData\Roaming\npm\qloo.cmd` on this machine. Tool
+  invocations under the workspace sandbox could not access it; running the
+  command with the existing local credential and required permission worked.
+  Never print `.env` or commit credentials. The backend venv uses Python
+  3.12.10 and is gitignored.
+- With servers already up, mocked browser test:
+  `cd frontend; npx playwright test e2e/decision.spec.ts --reporter=line`.
+  Starting Playwright's own `webServer` sometimes hung during teardown;
+  reusing a separately running `npm run dev` server made the test exit cleanly.
+  Live browser test: set `E2E_LIVE=1` and run
+  `npx playwright test e2e/decision.live.spec.ts --reporter=line` after
+  restarting the backend. It creates a test decision record; remove only
+  records with the exact test venue name afterward.
+- `git status --short` includes prior uncommitted agent fixes and docs from
+  before this continuation. Do not reset or overwrite them. The new SQLite
+  DB and local venv are ignored. Run `graphify update .` after future code
+  edits, and expect graph output to be rewritten.
+
+---
+
+The remaining sections are earlier handoff history. Use the active checkpoint
+above for current implementation status and next actions.
+
+## Start here
+
+The user has set aside the hackathon deadline and wants a substantially
+stronger product. **Use [the new product plan](docs/PRODUCT_IMPLEMENTATION_PLAN.md)
+as the forward plan** and [current functionality](docs/CURRENT_FUNCTIONALITY.md)
+as the code baseline. `docs/qloo-contract.md` records live Qloo behavior.
+`IMPLEMENTATION.md` and the older notes below are historical build context;
+their deployment-first ordering is no longer the product priority.
+
+Product hypothesis: a hospitality group marketing/experience lead uses
+Tastewell repeatedly to choose a programming or partnership pilot across
+several venues. The operator supplies real venues, candidate acts/themes/
+brands, constraints, and later an aggregated outcome. Tastewell uses Qloo
+to discover and assess cultural fit, presents traceable alternatives, and
+saves a decision and pilot plan. MapLibre plus self-hosted PMTiles is an
+**optional** geographic evidence view, gated on validated Qloo location
+semantics. It must not imply foot traffic, sales, or causal impact.
+
+**Next work: Phase 0 of the product plan.** Create a validation pack with
+buyer hypotheses, interview guide, three realistic benchmark decisions,
+quality rubric, and Qloo probe matrix. Work on the pack and safe contract
+probes independently; the gate for advancing to the decision engine needs
+feedback from real operators. Once the first decision is confirmed, build
+Phases 1–2 as a narrow vertical slice before redesigning the UI.
+
+Phase 0 progress (2026-10-27): `docs/VALIDATION.md` now contains the buyer
+hypotheses, interview guide, three synthetic benchmark decisions, scoring
+rubric, probe matrix, and record template. Its examples and thresholds are
+explicit assumptions pending operator feedback. No new Qloo contract claim
+has been made: `qloo` was unavailable on this shell's PATH when the bounded
+probes were attempted, and Graphify's installed launcher failed before a
+query could run (`uv trampoline failed to canonicalize script path`). No code
+was changed. The five interviews, buyer gate, and three live probes remain.
+
+Experimental product slice (2026-10-27): `/decision` now exercises a typed,
+deterministic Qloo evidence path and records an operator's pilot choice in
+memory. See `docs/CURRENT_FUNCTIONALITY.md` for exact scope and limitations.
+Seven focused backend `unittest` checks pass; frontend lint, TypeScript,
+and production build pass. The full pytest suite could not run in this shell
+(`py -3.12` finds no installed Python; the available Python lacks pytest).
+The frontend now uses a system font stack so builds do not depend on fetching
+Google Fonts. `graphify update .`
+was attempted after code changes and failed with the same uv trampoline
+error. No live Qloo calls or operator interviews have been completed for this
+slice, so the Phase 0 gate is still open.
+
+Before editing code, read `AGENTS.md`. It requires querying the local
+Graphify index before searching or reading source for codebase questions.
+`graphify-out/graph.json` exists (code-only AST map: 492 nodes, 1,236 edges);
+for example, run `graphify query "brief flow Qloo evidence" --budget 1800`.
+The full `graphify .` semantic scan was rejected by automatic approval
+review because it would upload repository docs/images to Gemini. The safe
+local map was built with `graphify . --code-only`. After code changes, use
+`graphify update .` per `AGENTS.md`.
+
+Check `git status` before work and preserve all existing changes; the tree
+currently includes uncommitted agent fixes, docs, `LICENSE`, `README.md`,
+and Graphify install files. Servers were restarted on 2026-10-27 at backend
+:8000 and frontend :3000, but verify listeners before relying on them.
+The latest backend suite passed 69 tests with one live test skipped; the
+frontend lint passed. A live grounded taco-shop run completed after the
+empty-final repair was added, though that run did not exercise the repair.
+
+## Historical hackathon handoff
+
+The following notes describe the deadline-driven plan and prior live runs.
+They remain useful for operations and regressions, but P5 deployment is not
+the next product-design phase.
+
+## Current session update (2026-10-27)
+
+- Product planning: `docs/CURRENT_FUNCTIONALITY.md` records implemented
+  behavior and limits; `docs/PRODUCT_IMPLEMENTATION_PLAN.md` proposes a
+  venue decision workspace with phased gates. The revised buyer hypothesis
+  is a multi-venue hospitality group making recurring programming and
+  partnership decisions. The plan includes real operator pilots, optional
+  MapLibre/PMTiles geographic evidence, saved decisions, and an outcome loop.
+  It supersedes this handoff's old deployment-first priority when choosing
+  new feature work. Graphify's
+  local code-only index was used for navigation (492 nodes, 1,236 edges);
+  full doc/image semantic indexing was blocked by auto-review.
+- Root `LICENSE` (MIT) and `README.md` added for the submission package. The
+  README documents the current local product, Qloo evidence flow, setup,
+  limitations, and honest hosting status. Public deployment/repo remain open.
+- User-run taco preset failed after both Qloo recommendations returned `ok`:
+  backend logged "final reply not parseable as JSON brief" and returned
+  `exit=aborted`. This is the intermittent 20b final-response issue, not
+  Qloo readiness or a tool failure. The agent now retries an empty/invalid
+  final up to twice with tools disabled, using existing Qloo evidence; it
+  records content length and model `finish_reason` on each failure. It still
+  aborts honestly if the repair attempts fail. Backend tests: 69 passed,
+  1 live skipped. Backend restarted with this fix.
+- One live grounded taco-shop/Austin/young-families rerun finished `ok` in
+  4 LLM steps with 19 trace events (run `2026-10-27T121118-0095f2`). This
+  rerun did not require the repair path; the intermittent case remains to
+  be observed live when it next occurs.
+- The grounded pane's apparent stall was traced to Qloo MCP startup before
+  `run_started`, matching the timed run below. It now emits
+  `connecting_qloo_mcp` immediately and displays "connecting to Qloo…";
+  readiness has a 90-second timeout that ends the run with an error if the
+  connection truly stalls. `readiness_ok` displays "Qloo connected".
+- Frontend lint passed for the readiness UI change.
+- Keep `openai/gpt-oss-20b` on OpenRouter for the demo. The provider already
+  has bounded 429/5xx retries. OpenRouter free models are limited to 50/day
+  and 20/minute unless at least $10 of credits have been purchased, which
+  raises the daily cap to 1,000. The user confirms the account has purchased
+  $10 of credits, so the 1,000/day cap applies. Failed free requests count.
+  The user also reports that gpt-oss-20b sometimes returns an empty reply;
+  capture the response shape/finish reason on the next reproduction before
+  changing models or retry behavior.
+- Verify the connection event and empty-final recovery in future live runs;
+  the historical P5 deployment phase is not the next product-design phase.
 
 ## 0. Where we are
 
@@ -133,9 +436,9 @@ venue concepts resolve. Do not add presets with dead-end audiences.
 
 ## 7. Working session env (end state)
 
-- Backend: :8000 running via `backend\serve.ps1`, OpenRouter +
-  `openai/gpt-oss-20b`, health 200. Restart ONLY via that script.
-- Frontend: dev server on :3000 (hot reload). Open http://localhost:3000.
+- Backend: :8000 running, configured for OpenRouter +
+  `openai/gpt-oss-20b`. Restart ONLY via `backend\serve.ps1`.
+- Frontend: :3000 running via `npm run dev` from `frontend/`.
 - Stop: kill the :8000 python pid and :3000 node pid from
   `Get-NetTCPConnection -LocalPort <port> -State Listen`.
 - Qloo key: hackathon host, unchanged. Qloo MCP readiness spawn can take

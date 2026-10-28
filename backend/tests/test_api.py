@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
@@ -105,6 +106,8 @@ async def test_grounded_run_stream_full_cycle():
 
         events = await collect_events(ac, body["run_id"])
     types = [e["type"] for e in events]
+    statuses = [e["message"] for e in events if e["type"] == "status"]
+    assert statuses[:2] == ["connecting_qloo_mcp", "readiness_ok"]
     assert "tool_call" in types and "tool_result" in types
     assert "final" in types and "run_done" in types
     assert types.count("run_done") == 1
@@ -228,6 +231,32 @@ async def test_provider_config_error_is_honest_and_terminates():
     assert done["type"] == "run_done" and done["exit_status"] == "error"
     assert any(e["type"] == "status" and e.get("message") == "run_error"
                for e in events)
+
+
+@pytest.mark.asyncio
+async def test_mcp_readiness_timeout_terminates_run(monkeypatch):
+    from app.api import engine as engine_module
+
+    class SlowClient(FakeClient):
+        async def __aenter__(self):
+            await asyncio.sleep(0.05)
+            return await super().__aenter__()
+
+    monkeypatch.setattr(engine_module, "MCP_READINESS_TIMEOUT", 0.01)
+    client = SlowClient([])
+    engine = make_engine(FakeProvider([]), client)
+    state = await engine.new_run(
+        engine_module.RunRequest(brief="jazz club", mode="grounded")
+    )
+    await engine.wait_run(state.run_id)
+    assert state.status == "error"
+    assert "Qloo MCP connection timed out" in state.error
+    assert client.closed == 1
+    assert [event["message"] for event in state.trace.events
+            if event["type"] == "status"] == [
+                "connecting_qloo_mcp", "run_error"
+            ]
+    assert state.trace.events[-1]["type"] == "run_done"
 
 
 @pytest.mark.asyncio

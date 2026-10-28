@@ -149,12 +149,34 @@ async def test_step_budget_aborts():
 
 @pytest.mark.asyncio
 async def test_unparseable_final_honest_abort():
-    provider = FakeProvider([Reply(content="I wrote prose, no JSON")])
+    provider = FakeProvider([Reply(content="I wrote prose, no JSON")] * 3)
     client = FakeClient([])
     runner, _ = grounded_runner(provider, client, max_steps=3)
     outcome = await runner.run(BriefRequest("x"))
     assert outcome.status == "aborted"
     assert outcome.brief["raw"] == "I wrote prose, no JSON"
+    assert len(provider.seen) == 3
+    assert provider.seen[1][1] is None
+
+
+@pytest.mark.asyncio
+async def test_empty_final_retries_without_repeating_qloo_tools():
+    provider = FakeProvider([
+        Reply(tool_calls=[{"id": "t1", "name": "qloo_find_tags",
+                           "args": {"query": "jazz"}}]),
+        Reply(content="", finish_reason="length"),
+        Reply(content=json.dumps(FINAL_BRIEF)),
+    ])
+    client = FakeClient([OK_FIND_TAGS])
+    runner, _ = grounded_runner(provider, client, max_steps=5)
+    outcome = await runner.run(BriefRequest("jazz club"))
+    assert outcome.status == "ok"
+    assert outcome.brief["evidence"]
+    assert client.ops == [("find_tags", {"query": "jazz"})]
+    assert provider.seen[2][1] is None
+    assert any(e.get("message") == "unparseable_final" and
+               e.get("finish_reason") == "length"
+               for e in runner.trace.events)
 
 
 def test_parse_brief_json_variants():

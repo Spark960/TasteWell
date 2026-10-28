@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 body {
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: ui-sans-serif, system-ui, sans-serif;
 }
 
 /* thin scrollbar for trace + pane scrollers */

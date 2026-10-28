@@ -241,6 +241,7 @@ class AgentRunner:
     ) -> AgentOutcome:
         steps_left = budget if budget is not None else self.max_steps
         outcome = AgentOutcome(mode=mode)
+        format_retries = 0
         while steps_left > 0:
             steps_left -= 1
             outcome.steps += 1
@@ -250,7 +251,12 @@ class AgentRunner:
                 "llm_started", step=outcome.steps,
                 mode=mode, tools=bool(specs),
             )
-            reply = await self.provider.chat(messages, tools=specs)
+            reply = await self.provider.chat(
+                messages, tools=None if format_retries else specs
+            )
+            if format_retries and reply.wants_tools:
+                # A format repair may only write from evidence already seen.
+                reply = Reply(content="", finish_reason=reply.finish_reason)
             self.trace and self.trace.log(
                 "llm", step=outcome.steps,
                 tool_calls=[tc["name"] for tc in reply.tool_calls],
@@ -280,12 +286,31 @@ class AgentRunner:
             outcome.raw_final = reply.content or ""
             brief = parse_brief_json(outcome.raw_final)
             if brief is None:
-                log.warning("final reply not parseable as JSON brief")
-                outcome.status = "aborted"
+                log.warning(
+                    "final reply not parseable as JSON brief "
+                    "(length=%d, finish_reason=%s)",
+                    len(outcome.raw_final), reply.finish_reason or "unknown",
+                )
                 self.trace and self.trace.log(
                     "status", message="unparseable_final",
-                    content=reply.content or "",
+                    content_length=len(outcome.raw_final),
+                    finish_reason=reply.finish_reason or "unknown",
+                    attempt=format_retries + 1,
                 )
+                if format_retries < 2 and steps_left > 0:
+                    format_retries += 1
+                    messages.append({
+                        "role": "user",
+                        "content": (
+                            "Your final response was empty or invalid JSON. "
+                            "Using only the Qloo tool results already above, "
+                            "return the complete concept brief as one valid "
+                            "JSON object with the required section names. "
+                            "Do not call more tools or invent evidence."
+                        ),
+                    })
+                    continue
+                outcome.status = "aborted"
                 outcome.brief = {
                     "raw": outcome.raw_final,
                     "disclaimers": [AGGREGATE_DISCLAIMER],

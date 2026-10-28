@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import Link from "next/link";
 import {
   fetchRunSummary,
   startRun,
@@ -171,6 +172,7 @@ export default function TastewellApp() {
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-4 py-6">
       <header className="mb-6">
+        <Link href="/decision" className="float-right rounded-md border border-amber-400 px-3 py-2 text-sm text-amber-300">Try programming decision</Link>
         <h1 className="text-2xl font-bold tracking-tight text-zinc-50">
           Tastewell
         </h1>

@@ -1,5 +1,10 @@
 # Tastewell — Implementation Plan & Knowledge Base
 
+> Historical hackathon implementation record. For the current feature
+> inventory and the proposed product direction, use
+> `docs/CURRENT_FUNCTIONALITY.md` and
+> `docs/PRODUCT_IMPLEMENTATION_PLAN.md`.
+
 **Project:** Tastewell — a Qloo-grounded venue & hospitality taste agent (Qloo Agentic Hackathon, Devpost).
 **One-liner:** An agent that tells restaurants/venues what their catchment area and target audience actually like — menu tilt, music/programming, brand direction — grounded in Qloo's taste graph, with a built-in "grounded vs. ungrounded" side-by-side demo.
 **Repo owner:** Local git only for now; GitHub remote added later (public + MIT license required by rules).
@@ -386,7 +391,8 @@ Verify checklist:
 - [ ] Fresh-clone setup script works on a clean machine
 
 Resume context:
-- Done: —
+- Done: root MIT `LICENSE` and setup/product `README.md` added 2026-10-27;
+  update the README with the public demo URL and final product flow after P5.
 - In flight: —
 - Next command: `git remote add origin <repo-url> && git push -u origin main`
 ---

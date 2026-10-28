@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import copy
 import json
 import logging
 import os
@@ -84,11 +85,13 @@ class QlooMcpClient:
         base_urls: tuple[str, str] = ("https://hackathon.api.qloo.com",) * 2,
         env: dict[str, str] | None = None,
         max_retries: int = 2,
+        cache_ttl: float = 300.0,
         sleep: Callable[[float], None] = time.sleep,
         session: Any = None,
     ) -> None:
         self.qloo_bin = resolve_qloo_bin(qloo_bin)
         self.max_retries = max_retries
+        self.cache_ttl = cache_ttl
         self._sleep = sleep
         self._session = session
         self._api_key = api_key
@@ -101,6 +104,9 @@ class QlooMcpClient:
         self.write_stream = None
         self.tools: dict[str, dict] = {}
         self.capabilities: NormalizedResult | None = None
+        # Per-session cache: credentials and results never cross client instances.
+        self._cache: dict[str, tuple[float, NormalizedResult]] = {}
+        self._cache_locks: dict[str, asyncio.Lock] = {}
 
     async def __aenter__(self) -> "QlooMcpClient":
         if self._session is not None:
@@ -154,6 +160,8 @@ class QlooMcpClient:
             self._cm_stack = None
         self.read_stream = self.write_stream = None
         self.tools = {}
+        self._cache.clear()
+        self._cache_locks.clear()
 
     def _absorb_tools(self, tool_list: Any) -> None:
         for t in tool_list:
@@ -221,6 +229,25 @@ class QlooMcpClient:
     async def call_tool(
         self, operation: str, payload: dict
     ) -> NormalizedResult:
+        if self.cache_ttl <= 0 or operation == "capabilities":
+            return await self._call_uncached(operation, payload)
+        key = json.dumps([operation, self._clean_payload(payload)], sort_keys=True,
+                         separators=(",", ":"))
+        lock = self._cache_locks.setdefault(key, asyncio.Lock())
+        async with lock:
+            cached = self._cache.get(key)
+            if cached and cached[0] > time.monotonic():
+                log.info("mcp=%s cache-hit", operation)
+                return copy.deepcopy(cached[1])
+            result = await self._call_uncached(operation, payload)
+            if result.status in ("ok", "empty"):
+                self._cache[key] = (time.monotonic() + self.cache_ttl,
+                                    copy.deepcopy(result))
+                if len(self._cache) > 128:
+                    self._cache.pop(next(iter(self._cache)))
+            return result
+
+    async def _call_uncached(self, operation: str, payload: dict) -> NormalizedResult:
         attempt = 0
         result = await self.call_once(operation, payload)
         while (

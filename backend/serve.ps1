@@ -27,8 +27,21 @@ foreach ($l in $lines) {
 # Provider/model: .env wins; these defaults keep the historical Groq setup.
 if (-not $env:LLM_PROVIDER) { $env:LLM_PROVIDER = "groq" }
 if (-not $env:LLM_MODEL) { $env:LLM_MODEL = "openai/gpt-oss-120b" }
+if (-not $env:QLOO_BIN) {
+    $installedQloo = Join-Path ([Environment]::GetFolderPath("ApplicationData")) "npm\qloo.cmd"
+    if (Test-Path -LiteralPath $installedQloo) { $env:QLOO_BIN = $installedQloo }
+}
 
-$proc = Start-Process py -ArgumentList "-3.12","-m","uvicorn","app.main:app","--port","$Port" `
+$localPython = Join-Path $PSScriptRoot ".venv\Scripts\python.exe"
+if (Test-Path -LiteralPath $localPython) {
+    $pythonExe = $localPython
+    $pythonArgs = @("-m", "uvicorn", "app.main:app", "--port", "$Port")
+} else {
+    $pythonExe = "py"
+    $pythonArgs = @("-3.12", "-m", "uvicorn", "app.main:app", "--port", "$Port")
+}
+
+$proc = Start-Process $pythonExe -ArgumentList $pythonArgs `
     -WorkingDirectory (Join-Path $repo "backend") -WindowStyle Hidden `
     -RedirectStandardError $errLog -PassThru
 Start-Sleep -Seconds 5
