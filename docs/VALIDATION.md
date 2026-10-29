@@ -6,6 +6,29 @@ evidence and explicit assumptions; it is **not customer or revenue validation**.
 The `/decision` workspace implements part of the workflow below. Synthetic
 briefs and source-backed desk research are the evaluation method for now.
 
+## Hosted technical validation (2026-10-29)
+
+The private demo is running on a 2 GB AWS Lightsail instance in Mumbai. Its
+public HTTPS endpoint returned a valid certificate and the expected Basic Auth
+challenge. All three containers were running. The production backend's Qloo
+status reported `ready: true` and exposed the expected MCP tools.
+
+An opt-in cloud smoke created a **synthetic** Brooklyn jazz decision through
+the production HTTP backend, resolved the Qloo music tag, saved 3 options and
+23 evidence rows, ran the bounded model review, and reopened the saved
+recommendation. The decision ID was `dec_b82b61777794`; a backend restart
+preserved its review in SQLite. The test did not select a pilot. Host memory
+after the journey was about 723 MiB used, 1.2 GiB available, and 20 MiB of
+2 GiB swap used. The non-live backend suite passed 98 tests with 3 live tests
+deselected.
+
+The first hosted review abstained solely because a fee was unknown. That
+violated the pilot proposal contract, so the agent prompt, venue tool result,
+and validation repair were corrected and a regression test added. The next
+hosted run returned a recommendation. These are technical checks on a
+synthetic brief; public browser sign-in and end-to-end UI inspection remain
+pending, and this result does not establish usefulness for a real operator.
+
 ## Published proxy evidence (not interviews)
 
 - The [National Restaurant Association's 2026 industry report](https://www.restaurant.org/research-and-media/research/research-reports/state-of-the-industry/)

@@ -1,44 +1,49 @@
 # Tastewell handoff for the next chat (2026-10-29)
 
-## Live deployment checkpoint — 2 GB Lightsail instance (2026-10-29)
+## Live deployment checkpoint — hosted journey passed internally (2026-10-29)
 
-The user resumed the goal and chose the cheaper 2 GB plan. This checkpoint
-supersedes the older statement below that the instance is only prepared.
+This section supersedes the older creation-pending checkpoint below. The active
+goal remains open until the public UI journey and final release checks pass.
 
-- The user created `tastewell-demo` in AWS Lightsail, Mumbai: Ubuntu 24.04,
-  dual-stack, 2 GB RAM, 2 vCPU, 60 GB SSD, $12/month. It is running. A static
-  IPv4 address is attached, and firewall ports 80 and 443 are open. SSH 22 is
-  still open broadly during setup and should be tightened after deployment.
-- The app hostname `tastewell.35-154-50-144.sslip.io` resolves to the attached
-  static IP. Caddy/HTTPS has **not** started or been verified yet.
-- On the server, a 2 GB swap file was created and made persistent. Official
-  Docker Engine and Compose are installed. The public repository was cloned to
-  `/home/ubuntu/tastewell` at release commit `72e234f`. Both the backend and
-  frontend Docker images built successfully, one at a time, on the 2 GB host.
-  Thus 4 GB was not required for the build; runtime memory is not measured yet.
-- The server's gitignored `/home/ubuntu/tastewell/.env` is mode 600 and has
-  non-secret Qloo host settings, OpenRouter provider/model, and a generated
-  64-character session signing secret. Its `QLOO_API_KEY` and
-  `OPENROUTER_API_KEY` values were initially empty; the user says they have now
-  entered both keys in the Lightsail SSH terminal. Verify presence by length
-  only; do not read or print their values. The mode-600
-  `/home/ubuntu/tastewell-runtime.env` has the
-  hostname, 80/443 binds, username `judge`, and an empty
-  `ACCESS_PASSWORD_HASH`. The user is also setting their own demo password and
-  entering its Caddy hash. Browser control policy requires the user to enter
-  this new authentication credential themselves. An async request is pending
-  for them to say “password hash ready” when finished.
-- Once the user finishes: verify only key/hash presence and file modes without
-  displaying values. Run `sudo docker compose --env-file
-  /home/ubuntu/tastewell-runtime.env -f deploy/compose.yaml config --quiet`,
-  initialize the backend volume owner, and run `up -d --no-build`. Then verify
-  three running services, HTTPS certificate, Basic Auth gate, `/api/health`,
-  `/api/qloo/status`, a real decision and agent review, persistence across
-  backend restart, and runtime memory (`free -h`, `docker stats --no-stream`).
-  Only then is the external demo gate passed.
-- The corrected $12 deployment guide was pushed as commit `61831ee` to
-  `origin/main`. The server clone has the prior docs commit, but app code is
-  identical. No Qloo/model API key was transferred by the agent.
+- `tastewell-demo` runs in AWS Lightsail Mumbai: Ubuntu 24.04, dual-stack,
+  **2 GB RAM / 2 vCPU / 60 GB SSD at $12/month**. Static IPv4 `35.154.50.144`
+  is attached. Docker Engine/Compose, persistent 2 GB swap, and three running
+  app containers are in place. Host RAM after a live decision/review was about
+  723 MiB used and 1.2 GiB available; swap used about 20 MiB. The $24 4 GB
+  plan is not required by the observed build or this small demo workload.
+- `https://tastewell.35-154-50-144.sslip.io/decision` is the intended public
+  address. Local `curl` validated its TLS certificate and received the expected
+  `401` Basic Auth challenge from Caddy without credentials. Backend and
+  frontend ports are internal; only 80/443 are exposed publicly. SSH 22 is
+  still broadly open during setup and should be tightened after browser SSH
+  access requirements are checked.
+- The user entered Qloo and OpenRouter keys themselves into the server's
+  gitignored `/home/ubuntu/tastewell/.env`. The agent verified nonzero lengths
+  only. It contains a generated session signing secret. The user generated the
+  Caddy demo password/hash; the agent fixed missing single quotes around the
+  hash without displaying it. Both env files are mode 600. Never print their
+  contents or copy credentials into chat, logs, or GitHub.
+- The production backend reports `/api/qloo/status` with `ready: true` and
+  Qloo MCP capabilities. `deploy/cloud_journey_smoke.py` completed a real
+  Qloo-backed synthetic decision with 3 options and 23 saved evidence rows,
+  followed by a persisted agent **recommendation**. Its decision was
+  `dec_b82b61777794`. A backend restart preserved that recommendation in
+  SQLite. The first run had abstained over an unknown fee; commit `2952846`
+  corrected the rule and the rerun recommended. Local backend tests passed:
+  **98 passed, 3 live deselected**. The server checkout and backend image have
+  that commit; frontend and Caddy are running from the same release series.
+- Public browser UI verification is **pending**. Automated Chrome navigation
+  stopped at Basic Auth. The user was asked to open the HTTPS decision page,
+  enter username `judge` and their chosen password personally, and say when
+  the page is visible. After that, inspect the visible decision/review flow in
+  a fresh browser session, verify the gate really accepts the chosen password,
+  and check responsive/keyboard behavior. Then update validation and the
+  submission claims from observed behavior.
+- `deploy/smoke_test.sh` now checks Qloo readiness too. It needs the plaintext
+  demo password as an environment variable, so the agent has not run it; do not
+  ask the user to send that password in chat. The cloud journey test uses a
+  trusted loopback client and does not need the demo password. No Qloo/model
+  API key was transferred by the agent.
 
 ## Latest checkpoint — release pushed; Lightsail creation pending (2026-10-29)
 
