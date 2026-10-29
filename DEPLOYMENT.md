@@ -2,7 +2,7 @@
 
 Updated 2026-10-29. This guide is for the current **private pilot**. It puts the Next.js site, FastAPI API, Qloo harness, SQLite database, and Caddy web server on one Ubuntu machine. Follow the steps in order. Commands marked **Windows PowerShell** run on your computer; commands marked **Ubuntu terminal** run on the AWS server.
 
-The deployment has **not yet happened**. The local Docker daemon is unavailable and the local Qloo readiness check currently times out. You will know the AWS deployment is ready only after the checks in Step 8 pass on the new server.
+The Mumbai Lightsail instance is provisioned, but the app deployment is still in progress. The local Docker daemon is unavailable; a prior local live browser journey passed with real Qloo and a model. You will know the AWS deployment is ready only after the checks in Step 8 pass on the new server.
 
 ## What you are creating
 
@@ -19,14 +19,14 @@ This is a **single-password pilot**. Each browser has a signed session, and save
 
 | Choice | Published starting price | Tradeoff |
 | --- | ---: | --- |
-| **Lightsail Linux 4 GB, 2 vCPU, 80 GB SSD** | **$24/month** | Recommended. Fixed bundle and enough room to try building this multi-container app on the server. |
-| Lightsail Linux 2 GB, 2 vCPU, 60 GB SSD | $12/month | Cheaper, but image builds and concurrent Qloo/model calls may run out of memory. Try only after measuring the 4 GB pilot. |
+| **Lightsail Linux 2 GB, 2 vCPU, 60 GB SSD** | **$12/month** | Chosen for the hackathon demo. Build images sequentially and measure runtime memory. |
+| Lightsail Linux 4 GB, 2 vCPU, 80 GB SSD | $24/month | Upgrade path if the 2 GB build fails or sustained runtime memory pressure appears. |
 | EC2 t3.small, 2 GB | $0.0209/hour in US East before disk and public IPv4 | More control, but more billing items and setup. No benefit for this first single-server pilot. |
 | ECS/Fargate, App Runner, managed database | Multiple usage-based charges | Useful later for a larger service; extra setup and persistence work now. |
 
-The Lightsail bundle figures come from [AWS Lightsail pricing](https://aws.amazon.com/lightsail/pricing/); the EC2 comparison uses [AWS T3 pricing](https://aws.amazon.com/ec2/instance-types/t3/). Check the exact plan shown in **your selected region** before clicking Create. The 4 GB choice is an engineering estimate, not a tested minimum. Lightsail includes a transfer allowance; **Mumbai and several other regions get half the headline allowance**, according to [AWS transfer rules](https://docs.aws.amazon.com/lightsail/latest/userguide/amazon-lightsail-faq-data-transfer-allowance.html). A small private pilot is unlikely to approach it, but monitor usage.
+The Lightsail bundle figures come from [AWS Lightsail pricing](https://aws.amazon.com/lightsail/pricing/); the EC2 comparison uses [AWS T3 pricing](https://aws.amazon.com/ec2/instance-types/t3/). The selected Mumbai 2 GB plan shows **1.5 TB transfer** in the console. Mumbai and several other regions get half the headline allowance, according to [AWS transfer rules](https://docs.aws.amazon.com/lightsail/latest/userguide/amazon-lightsail-faq-data-transfer-allowance.html). The 2 GB runtime capacity is still unmeasured; upgrade by creating a larger instance from a snapshot if needed.
 
-You reported **$138 in AWS credits and 82 days left**. At a $24/month reference price, 82 days of this one instance is roughly **$66**, so about **$72 of those credits might remain** if the credits cover Lightsail. This is an estimate, not a bill. Domain registration, snapshots, taxes, overage, and any other AWS resources are extra. [AWS credit terms](https://aws.amazon.com/awscredits/) exclude Route 53 domain registration. Check **Billing and Cost Management → Credits** for the exact credit eligibility and expiration.
+Check **Billing and Cost Management → Credits** for the current balance, eligibility and expiration. The $12/month instance is billed hourly up to the monthly cap. Domain registration, snapshots, taxes, overage and any other AWS resources may be extra. [AWS credit terms](https://aws.amazon.com/awscredits/) exclude Route 53 domain registration.
 
 An AWS **Free Plan** can end when its time or credits run out; [AWS's Free Tier FAQ](https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/free-tier-FAQ.html) says the account then closes and access to resources/data is lost unless you upgrade. **Set a reminder at least 14 days before the date shown in your console** to export the database and choose whether to upgrade. A stopped Lightsail instance still accrues instance charges; deletion stops that charge ([Lightsail billing FAQ](https://docs.aws.amazon.com/en_en/lightsail/latest/userguide/amazon-lightsail-frequently-asked-questions-faq-billing-and-account-management.html)).
 
@@ -37,7 +37,7 @@ Have these ready:
 1. Your AWS sign-in with multifactor authentication. Avoid daily use of the root account; [AWS account security guidance](https://docs.aws.amazon.com/IAM/latest/UserGuide/root-user-best-practices.html) explains why.
 2. A domain you control, or choose the temporary no-domain route near the end of this guide. A purchased domain is usually a separate charge.
 3. Your Qloo API key and one model-provider key. Keep them on the server only. Do **not** paste them into chat, commit them to Git, or include them in the deployment archive.
-4. Windows PowerShell with the built-in tar, ssh, and scp commands. Check them with Get-Command tar,ssh,scp. If ssh/scp are missing, install **OpenSSH Client** in Windows Settings → Optional features; [Microsoft's instructions](https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse?pivots=windows-11&tabs=gui) show the steps. The archive path below is designed for this repository's current uncommitted working tree; it does not require GitHub.
+4. Windows PowerShell with the built-in tar, ssh, and scp commands if you use the archive fallback in Step 5. Check them with Get-Command tar,ssh,scp. If ssh/scp are missing, install **OpenSSH Client** in Windows Settings → Optional features; [Microsoft's instructions](https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse?pivots=windows-11&tabs=gui) show the steps.
 
 ### Step 1 — Set a cost alert and inspect your credits
 
@@ -54,7 +54,7 @@ Open [Lightsail](https://lightsail.aws.amazon.com/). AWS's [instance walkthrough
 1. On the Lightsail home page, choose **Create instance**.
 2. Select the region nearest your pilot users. If users are primarily in India, **Asia Pacific (Mumbai)** is a reasonable first choice. Otherwise choose their nearest available region. Keep the same region for the static IP. Availability zone can stay at the default.
 3. Choose **Linux/Unix → OS Only → Ubuntu 24.04 LTS**. Do not choose a WordPress, LAMP, or preconfigured Docker image; this repository installs its own stack. Choose a **dual-stack/public IPv4** bundle so a normal A record works.
-4. Select the **4 GB / 2 vCPU / 80 GB** plan shown at the published $24/month reference price. Read the price on the confirmation screen.
+4. Select the **2 GB / 2 vCPU / 60 GB** plan at $12/month for the small demo. Read the price and transfer allowance on the confirmation screen.
 5. Use the region's **default SSH key** unless you already manage your own key. Name the instance something recognizable, such as tastewell-pilot. Choose **Create instance**.
 
 You can connect immediately using **instance → Connect → Connect using SSH** in the Lightsail browser. That browser terminal is the easiest place to run the Ubuntu commands below.
@@ -87,9 +87,9 @@ The result is pilot.example.com. Replace that name everywhere below with yours. 
 
 Caddy needs the domain to resolve to this host and ports **80/443** reachable to issue HTTPS automatically ([Caddy HTTPS docs](https://caddyserver.com/docs/automatic-https)). Do not share the URL until HTTPS and password protection both work.
 
-### Step 5 — Package this exact working tree and upload it
+### Step 5 — Get the published release
 
-This repository currently has **no Git remote and uncommitted project work**. A plain git clone on AWS would miss that work. The following archive contains only runtime source/configuration, excluding local credentials, SQLite data, tests, caches, and Git history.
+The tested source is published at [Spark960/TasteWell](https://github.com/Spark960/TasteWell). On Ubuntu, clone it with `git clone https://github.com/Spark960/TasteWell.git /home/ubuntu/tastewell` and check the release SHA with `git -C /home/ubuntu/tastewell log -1 --oneline`. The archive method below is only for deploying later local changes that have not been pushed.
 
 In **Windows PowerShell**, change to this repository's root and run:
 
@@ -192,10 +192,11 @@ Stay in **/home/ubuntu/tastewell**. First check that Compose can read all requir
 
 ~~~bash
 sudo docker compose --env-file /home/ubuntu/tastewell-runtime.env -f deploy/compose.yaml config --quiet
-sudo docker compose --env-file /home/ubuntu/tastewell-runtime.env -f deploy/compose.yaml build
+sudo docker compose --env-file /home/ubuntu/tastewell-runtime.env -f deploy/compose.yaml build backend
+sudo docker compose --env-file /home/ubuntu/tastewell-runtime.env -f deploy/compose.yaml build frontend
 ~~~
 
-The first build downloads images and dependencies and can take several minutes. The backend runs as Linux user ID 10001. Initialize write permission for its persistent database volume before first start:
+The first builds download images and dependencies and can take several minutes. On the 2 GB plan, build one service at a time. The instance has a 2 GB swap file for build headroom; inspect `free -h`, `df -h /`, and `sudo docker stats --no-stream` before deciding whether to upgrade. The backend runs as Linux user ID 10001. Initialize write permission for its persistent database volume before first start:
 
 ~~~bash
 sudo docker compose --env-file /home/ubuntu/tastewell-runtime.env -f deploy/compose.yaml run --rm --no-deps --user root backend chown 10001:10001 /app/backend/data
@@ -212,7 +213,7 @@ Then open **https://pilot.example.com/api/health** in the same browser; it shoul
 sudo docker compose --env-file /home/ubuntu/tastewell-runtime.env -f deploy/compose.yaml restart backend
 ~~~
 
-A local Qloo status check on 2026-10-28 returned **harness spawn timeout**, so cloud Qloo readiness is a required gate. A healthy /api/health response alone does not prove Qloo works. The optional deploy/smoke_test.sh script can run from Git Bash/WSL with TASTEWELL_URL, ACCESS_USER, and ACCESS_PASSWORD set locally; avoid putting the plaintext password in a committed file or a shared shell history.
+Cloud Qloo readiness and a real agent review are required gates. A healthy /api/health response alone does not prove Qloo works. The optional deploy/smoke_test.sh script can run from Git Bash/WSL with TASTEWELL_URL, ACCESS_USER, and ACCESS_PASSWORD set locally; avoid putting the plaintext password in a committed file or a shared shell history.
 
 ### Step 9 — Back up, monitor, update, and stop
 
