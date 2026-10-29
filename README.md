@@ -8,11 +8,44 @@ source queries and changed-audience or changed-region ranks show how Qloo
 informs a specific decision.
 
 **Hosted preview:** [Open the Tastewell decision workspace](https://tastewell.35-154-50-144.sslip.io/decision).
-The small AWS demo is password protected; judges need the shared access details
-in the submission's testing instructions. Use the live brief for Qloo-backed
-results. The instant illustrative decision is invented and clearly labeled.
+The small AWS demo is password protected. Access details and a complete judge
+walkthrough are below. Use the live brief for Qloo-backed results. The instant
+illustrative decision is invented and clearly labeled.
 The [Devpost entry](https://devpost.com/software/tastewell-yi3k57) was submitted
 to the Qloo Agentic Hackathon on 2026-10-29.
+
+## Judge access and testing
+
+Open the [hosted decision workspace](https://tastewell.35-154-50-144.sslip.io/decision).
+When the browser asks for HTTP Basic Authentication, enter:
+
+```text
+Username: judge
+Password: the value in the Devpost submission's judge-only Additional info
+```
+
+The demo is free to use during judging. To inspect the product quickly, choose
+**See an illustrative decision**. This read-only example uses invented names,
+IDs, and ranks and makes no Qloo call. For a live Qloo-backed test:
+
+1. Choose **Start your own decision** and enter a synthetic brief: venue
+   `Judge test listening room`, concept `jazz`, region `Brooklyn, New York`,
+   and audience `millennials`.
+2. If Qloo presents multiple concept matches, choose the music-genre jazz tag.
+   Wait for the decision job to finish, then review the artist options and open
+   **Inspect Qloo evidence** to see the source IDs and queries.
+3. Run **Review the pilot choice** to see the bounded agent's cited proposal,
+   actions, alternatives, and unknowns. The operator makes the final selection.
+4. Change the scenario region to `Los Angeles, California` and choose
+   **Compare scenario**. The app reranks the same artist IDs and shows any
+   movement without treating scores from separate calls as directly comparable.
+5. Reopen the decision from saved history or export its JSON to inspect the
+   retained evidence and review. Test decisions are synthetic; do not record
+   a real-world outcome for this walkthrough.
+
+Live Qloo results may vary by audience and region, so exact artist names and
+rank changes are not guaranteed on every run. The [official hackathon rules](https://qloo.devpost.com/rules)
+allow private demos when login credentials are provided in testing instructions.
 
 ## Why Qloo
 
@@ -150,4 +183,6 @@ still required before claiming product value or commercial viability.
 
 ## License
 
-[MIT](LICENSE). Do not commit `.env`, API keys, or private Qloo results.
+This project is open source under the [MIT License](LICENSE). The license file
+is at the repository root. Do not commit `.env`, API keys, or private Qloo
+results.
