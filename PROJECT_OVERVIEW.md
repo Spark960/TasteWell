@@ -4,7 +4,7 @@ Updated 2026-10-29. This is the root status for the Qloo Agentic Hackathon submi
 
 ## Verdict against the hackathon requirement
 
-**Working hosted Qloo integration and a visible bounded agent review: yes. Submission-ready: not yet.** The [hackathon overview](https://qloo.devpost.com/) asks for a working Qloo-powered application that is an agentic tool, uses an agent framework, or connects Qloo to an existing agent. Those are alternatives; the app does not need to recommend across every cultural category. Tastewell focuses on live-music programming, with place/concept tags and optional brand affinities.
+**Working hosted Qloo integration and a visible bounded agent review: yes. Devpost entry submitted on 2026-10-29.** The [hackathon overview](https://qloo.devpost.com/) asks for a working Qloo-powered application that is an agentic tool, uses an agent framework, or connects Qloo to an existing agent. Those are alternatives; the app does not need to recommend across every cultural category. Tastewell focuses on live-music programming, with place/concept tags and optional brand affinities.
 
 | Requirement | Current evidence | Assessment |
 | --- | --- | --- |
@@ -12,7 +12,7 @@ Updated 2026-10-29. This is the root status for the Qloo Agentic Hackathon submi
 | Qloo API integration and cultural grounding | The backend uses Qloo MCP `find_tags`, `recommend`/`describe`, and `rank`, storing IDs, queries, status, correlation, and retrieval times. | Hosted readiness was true. A public-browser run showed three artist options and a fixed-ID region comparison that changed two ranks. |
 | Agentic tool, framework, or existing agent | A bounded LLM review inspects saved option and venue facts, can request one Qloo scenario, and proposes a cited pilot or abstains. | Hosted browser showed a proposal, source links, actions, alternatives, unknowns, and next check. The operator retains the pilot selection. |
 | Qloo as the differentiator | Option names and ordinal ranks depend on Qloo-resolved IDs and responses. The illustrative example is explicitly invented. | Brooklyn-to-Los Angeles comparison moved two of three artists on the same shortlist; source queries were inspectable. |
-| Judge-accessible submission | [Hosted preview](https://tastewell.35-154-50-144.sslip.io/decision), [public repository](https://github.com/Spark960/TasteWell), MIT license detected by GitHub, and tested Basic Auth sign-in. | Devpost entry and testing instructions are not submitted. Overview and official rules conflict on whether a password-protected demo qualifies. |
+| Judge-accessible submission | [Hosted preview](https://tastewell.35-154-50-144.sslip.io/decision), [public repository](https://github.com/Spark960/TasteWell), MIT license detected by GitHub, and private-window Basic Auth sign-in confirmed by the user. | [Devpost entry](https://devpost.com/software/tastewell-yi3k57) submitted with judge-only access instructions and two clearly labeled illustrative screenshots. Overview and official rules conflict on whether a password-protected demo qualifies. |
 
 The official [rules](https://qloo.devpost.com/rules) permit a private test site when judges receive credentials, while the [overview](https://qloo.devpost.com/) says private-access-only demos do not qualify. The current preview uses Basic Auth to protect API quota and decision data. Resolve that eligibility risk in the final submission path.
 
@@ -42,11 +42,10 @@ On 2026-10-29, the public browser completed a fresh synthetic Qloo decision, age
 
 **Runtime check on 2026-10-29:** The hosted Qloo MCP harness reported `ready: true` with ten expected tools. A live decision and review ran on the 2 GB host, which had about 1.2 GiB available afterward. The $24 4 GB plan is not needed by the measured small demo workload.
 
-## Immediate priorities
+## After submission
 
-1. Resolve the private-demo eligibility ambiguity in the [overview](https://qloo.devpost.com/) versus [rules](https://qloo.devpost.com/rules); if keeping Basic Auth, put the username and password in Devpost testing instructions, not the public repository.
-2. Check the hosted UI on a narrow mobile viewport and with keyboard navigation. Run B2/B3 sparse and unsupported-input cases from [docs/VALIDATION.md](docs/VALIDATION.md), then seek an independent walkthrough.
-3. Prepare the Devpost description around the specific rank-changing decision, exact Qloo calls, visible provenance, and known limits. Submit before October 30, 2026 at 11:45 p.m. Eastern Time, then verify the receipt.
-4. Tighten SSH access after confirming how Lightsail browser SSH will continue to work, and arrange an off-instance backup if the demo retains real data.
+1. Keep the hosted demo and judge credentials working through the judging period. The [official rules](https://qloo.devpost.com/rules) permit private demo credentials in testing instructions and say they prevail over inconsistent materials, but the [overview](https://qloo.devpost.com/) says private-access demos do not qualify; final eligibility is the organizer's decision.
+2. Run B2/B3 sparse and unsupported-input cases from [docs/VALIDATION.md](docs/VALIDATION.md), then seek an independent operator walkthrough. The hosted 390px layout had no horizontal overflow and keyboard Tab showed a visible focus ring on 2026-10-29.
+3. Tighten SSH access after confirming how Lightsail browser SSH will continue to work, and arrange an off-instance backup if the demo retains real data.
 
-The app is a **hosted, technically verified Qloo-powered pilot tool**. It is not a validated business or a completed Devpost submission yet.
+The app is a **hosted, technically verified Qloo-powered pilot tool with a submitted Devpost entry**. It is not a validated business or a proven operator outcome.

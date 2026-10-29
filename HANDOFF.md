@@ -1,10 +1,57 @@
 # Tastewell handoff for the next chat (2026-10-29)
 
+## Devpost submission completed and latest frontend rollout (2026-10-29)
+
+This section supersedes the earlier instruction to deploy the button-contrast
+fix. The server at `/home/ubuntu/tastewell` fast-forwarded from `2952846` to
+`51eacdb`, built only the frontend image, and recreated only the frontend
+container. Compose showed backend, Caddy, and frontend up. The hosted decision
+page loaded after rollout; the live **Compare scenario** button has the
+`decision-primary` class with white text on dark green. At 390px there was no
+horizontal overflow, and keyboard Tab showed a visible focus ring on a form
+field. The public browser previously completed a Qloo-backed decision and
+review; this continuation used the invented sample and a saved decision, with
+no new Qloo call. An independent in-app browser could not open the HTTP Basic
+Auth site through its browser tool (`ERR_INVALID_AUTH_CREDENTIALS`), so an
+independent authenticated-browser check is still open.
+
+Devpost has a **submitted Tastewell entry** at
+`https://devpost.com/software/tastewell-yi3k57`. The project name, tagline,
+story, Qloo/Next.js/FastAPI/SQLite/Docker/TypeScript/Python/AWS tags, public
+demo URL, repository URL, start date (2026-10-16), and judge-only Additional
+info were saved. The preview rendered the story and both links. The Additional
+info field has a 255-character limit. It identified the HTTP Basic Auth user
+as `judge` and initially contained **[ENTER EXISTING DEMO PASSWORD]**. The
+username was verified from the server runtime file without printing any
+password or hash. The user reports replacing and saving that placeholder
+directly in Devpost; do not ask them to send the password in chat or read
+it back. `docs/DEVPOST_SUBMISSION_DRAFT.md`
+has complete reviewed copy and a testing path. Two invented-sample screenshots
+are in ignored `out/submission/illustrative-desktop.png` and
+`out/submission/illustrative-mobile.png`. The user enabled Chrome extension
+file access, and both approved images were uploaded to the Devpost gallery
+with captions saying the sample is invented and made no Qloo call. The
+preview showed both images; `out/submission/devpost-draft-preview.png` records
+the draft header and first image. The user replaced and saved the password
+in Devpost, then confirmed the same credentials work from a separate private
+browser window. Do not read or reveal the field's content.
+
+After explicit user confirmation that they agreed to the official rules and
+Devpost Terms, the final agreement box was checked and **Submit project** was
+clicked. Devpost displayed “Project submitted!” and the page showed
+“Submitted to Qloo Agentic Hackathon.” The screenshot receipt is in ignored
+`out/submission/devpost-submitted.png`; the entry is at the URL above. The
+official rules explicitly permit a private website when
+credentials are in testing instructions and state they prevail over
+inconsistent hackathon materials; the overview still says private-access
+demos do not qualify, so eligibility remains at organizer discretion. The
+deadline was 2026-10-30 11:45 p.m. EDT / 2026-10-31 9:15 a.m. IST. Keep the
+hosted demo and judge credentials working through the judging period.
+
 ## Live deployment checkpoint — hosted journey passed internally (2026-10-29)
 
-This section supersedes the older creation-pending checkpoint below. The active
-goal is paused at the user's request. Resume deployment and submission checks
-when they return; do not mark the full goal complete yet.
+This section records the earlier hosted checkpoint. The deployment and
+submission work is complete as described above.
 
 - **Immediate next step after resuming:** pull the latest public `main` on
   `/home/ubuntu/tastewell`, build the frontend image, and restart only the

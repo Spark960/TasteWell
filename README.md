@@ -11,6 +11,8 @@ informs a specific decision.
 The small AWS demo is password protected; judges need the shared access details
 in the submission's testing instructions. Use the live brief for Qloo-backed
 results. The instant illustrative decision is invented and clearly labeled.
+The [Devpost entry](https://devpost.com/software/tastewell-yi3k57) was submitted
+to the Qloo Agentic Hackathon on 2026-10-29.
 
 ## Why Qloo
 
