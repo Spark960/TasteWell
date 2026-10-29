@@ -3,7 +3,23 @@
 ## Live deployment checkpoint — hosted journey passed internally (2026-10-29)
 
 This section supersedes the older creation-pending checkpoint below. The active
-goal remains open until the public UI journey and final release checks pass.
+goal is paused at the user's request. Resume deployment and submission checks
+when they return; do not mark the full goal complete yet.
+
+- **Immediate next step after resuming:** pull the latest public `main` on
+  `/home/ubuntu/tastewell`, build the frontend image, and restart only the
+  frontend service with the existing Compose env file. A local UI polish fix
+  adds the `decision-primary` class to Compare scenario, Record selection,
+  and Record outcome; it corrects dark text on dark green buttons. Frontend
+  lint and production build passed locally, and `graphify update .` ran, but
+  this fix has **not** been deployed or visually rechecked on Lightsail.
+  Keep the private `.env` files in place and do not print them.
+- README, root overview, product context, and validation now reflect the
+  hosted browser results. The tested frontend fix and those documents were
+  pushed as `c8ddb00`. The server checkout still has older app code at
+  `2952846`; its running backend matches that release, while the frontend
+  image still predates the contrast fix. Pull `main` and rebuild frontend on
+  resumption. This handoff is the only subsequent local edit.
 
 - `tastewell-demo` runs in AWS Lightsail Mumbai: Ubuntu 24.04, dual-stack,
   **2 GB RAM / 2 vCPU / 60 GB SSD at $12/month**. Static IPv4 `35.154.50.144`
@@ -32,13 +48,25 @@ goal remains open until the public UI journey and final release checks pass.
   corrected the rule and the rerun recommended. Local backend tests passed:
   **98 passed, 3 live deselected**. The server checkout and backend image have
   that commit; frontend and Caddy are running from the same release series.
-- Public browser UI verification is **pending**. Automated Chrome navigation
-  stopped at Basic Auth. The user was asked to open the HTTPS decision page,
-  enter username `judge` and their chosen password personally, and say when
-  the page is visible. After that, inspect the visible decision/review flow in
-  a fresh browser session, verify the gate really accepts the chosen password,
-  and check responsive/keyboard behavior. Then update validation and the
-  submission claims from observed behavior.
+- Public browser UI verification **passed** after the user entered the Basic
+  Auth password. A fresh synthetic jazz brief resolved an ambiguous music tag,
+  displayed 3 Qloo-backed options, and completed a cited agent recommendation.
+  Cited links opened exact saved source rows. Saved decisions reopened the
+  review. A separate Brooklyn-to-Los Angeles comparison over the same artist
+  IDs shifted ranks 2→3 and 3→2; the UI marked the earlier review stale.
+  See `docs/VALIDATION.md` for limits. The model elected not to run the optional
+  comparison when offered the alternate region during a second review; the
+  separate scenario form did run it.
+- The public GitHub API confirms `Spark960/TasteWell` is public and detects
+  the MIT license. Official Devpost rules allow a private test site if judge
+  credentials are in testing instructions, while the event overview says
+  demos relying on private access do not qualify. Resolve this eligibility
+  risk before submission. The shared password should be supplied privately in
+  Devpost testing instructions, never in GitHub or chat. Prepare final
+  submission text and screenshots, check responsive/keyboard behavior and
+  the live URL from another browser, then submit before the published deadline.
+- Official rules show the deadline as **2026-10-30 11:45 p.m. EDT**. The
+  Lightsail server costs $12/month while it exists, including when stopped.
 - `deploy/smoke_test.sh` now checks Qloo readiness too. It needs the plaintext
   demo password as an environment variable, so the agent has not run it; do not
   ask the user to send that password in chat. The cloud journey test uses a
