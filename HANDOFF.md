@@ -1,5 +1,43 @@
 # Tastewell handoff for the next chat (2026-10-29)
 
+## Live deployment checkpoint — 2 GB Lightsail instance (2026-10-29)
+
+The user resumed the goal and chose the cheaper 2 GB plan. This checkpoint
+supersedes the older statement below that the instance is only prepared.
+
+- The user created `tastewell-demo` in AWS Lightsail, Mumbai: Ubuntu 24.04,
+  dual-stack, 2 GB RAM, 2 vCPU, 60 GB SSD, $12/month. It is running. A static
+  IPv4 address is attached, and firewall ports 80 and 443 are open. SSH 22 is
+  still open broadly during setup and should be tightened after deployment.
+- The app hostname `tastewell.35-154-50-144.sslip.io` resolves to the attached
+  static IP. Caddy/HTTPS has **not** started or been verified yet.
+- On the server, a 2 GB swap file was created and made persistent. Official
+  Docker Engine and Compose are installed. The public repository was cloned to
+  `/home/ubuntu/tastewell` at release commit `72e234f`. Both the backend and
+  frontend Docker images built successfully, one at a time, on the 2 GB host.
+  Thus 4 GB was not required for the build; runtime memory is not measured yet.
+- The server's gitignored `/home/ubuntu/tastewell/.env` is mode 600 and has
+  non-secret Qloo host settings, OpenRouter provider/model, and a generated
+  64-character session signing secret. Its `QLOO_API_KEY` and
+  `OPENROUTER_API_KEY` values are **empty**. The user explicitly chose to enter
+  those keys themselves in the Lightsail SSH terminal. Do not read or print
+  their values. The mode-600 `/home/ubuntu/tastewell-runtime.env` has the
+  hostname, 80/443 binds, username `judge`, and an empty
+  `ACCESS_PASSWORD_HASH`. The user is also setting their own demo password and
+  entering its Caddy hash. An async request is pending for them to say
+  “credentials ready” when finished.
+- Once the user finishes: verify only key/hash presence and file modes without
+  displaying values. Run `sudo docker compose --env-file
+  /home/ubuntu/tastewell-runtime.env -f deploy/compose.yaml config --quiet`,
+  initialize the backend volume owner, and run `up -d --no-build`. Then verify
+  three running services, HTTPS certificate, Basic Auth gate, `/api/health`,
+  `/api/qloo/status`, a real decision and agent review, persistence across
+  backend restart, and runtime memory (`free -h`, `docker stats --no-stream`).
+  Only then is the external demo gate passed.
+- The corrected $12 deployment guide was pushed as commit `61831ee` to
+  `origin/main`. The server clone has the prior docs commit, but app code is
+  identical. No Qloo/model API key was transferred by the agent.
+
 ## Latest checkpoint — release pushed; Lightsail creation pending (2026-10-29)
 
 The user asked to pause because usage is low. Resume the active goal when they
