@@ -387,28 +387,28 @@ export default function DecisionPage() {
     <div className="decision-layout">
     <aside className="decision-rail" aria-label="Decision guide">
       <div className="decision-rail-inner">
-        <p className="decision-rail-label">Your decision trail</p>
-        <h2>Choose one night to test.</h2>
-        <p className="decision-rail-copy">Compare artists for your venue, check the sources, and plan a small live-music pilot.</p>
-        <ol className="decision-steps">
-          <li className="is-active"><span>1</span><div><strong>Describe your venue</strong><small>Audience and limits</small></div></li>
-          <li className={decision?.options.length ? "is-active" : ""}><span>2</span><div><strong>Compare artists</strong><small>Qloo ranks and sources</small></div></li>
-          <li className={decision?.selected_option_id ? "is-active" : ""}><span>3</span><div><strong>Choose a pilot</strong><small>Who, where, and when</small></div></li>
-          <li className={decision?.outcome ? "is-active" : ""}><span>4</span><div><strong>Record the result</strong><small>What happened</small></div></li>
+        <h2>Choose a live-music test.</h2>
+        <p className="decision-rail-copy">Qloo finds and ranks artists. The agent checks the evidence and suggests a pilot. You decide what to try.</p>
+        <ol className="decision-steps" aria-label={isSample ? "Live decision steps; not run in this illustrative example" : "Live decision steps"}>
+          <li className={isSample ? "" : "is-active"}><span>1</span><div><strong>Venue brief</strong><small>Audience and limits</small></div></li>
+          <li className={!isSample && decision?.options.length ? "is-active" : ""}><span>2</span><div><strong>Qloo shortlist</strong><small>Artists ranked for the venue</small></div></li>
+          <li className={!isSample && (latestReview || reviewBusy) ? "is-active" : ""}><span>3</span><div><strong>Agent review</strong><small>Evidence checked, pilot proposed</small></div></li>
+          <li className={!isSample && decision?.selected_option_id ? "is-active" : ""}><span>4</span><div><strong>Your pilot</strong><small>You choose the plan</small></div></li>
+          <li className={!isSample && decision?.outcome ? "is-active" : ""}><span>5</span><div><strong>Result</strong><small>What happened afterward</small></div></li>
         </ol>
-        <div className="decision-rail-note"><strong>What Qloo tells you</strong><p>Which artists fit this audience and area. Your team still checks booking, costs, and results.</p></div>
+        <div className="decision-rail-note"><strong>What this cannot tell you</strong><p>Qloo shows aggregate cultural fit. It cannot confirm fees, availability, or ticket sales.</p></div>
       </div>
     </aside>
     <main className="decision-main">
     <section className="decision-intro">
       <h1>Find the right artist for your next venue night.</h1>
-      <p>Tell us about your venue and audience. Qloo ranks artist options, and an agent explains a small pilot with sources and open questions. You make the final choice.</p>
+      <p>Tell us about your venue and audience. Qloo finds and ranks artists. Then an agent checks those results and the venue rules before suggesting one pilot. You make the final choice.</p>
       <div className="decision-scope"><span className="decision-scope-dot" />Currently exploring <strong>live music</strong> <span aria-hidden="true">·</span> Up to 10 venues</div>
       <div className="decision-example-action">
         <button type="button" onClick={isSample ? closeSample : showSample}>
           {isSample ? "Start your own decision" : "See an illustrative decision"}
         </button>
-        <span>{isSample ? "The example uses invented names and IDs; no Qloo call was made." : "Opens instantly with a sample pilot and rank-changing scenario."}</span>
+        <span>{isSample ? "The example uses invented data. Start your own decision to run Qloo and the agent." : "Invented example. Start a new decision for live Qloo and agent review."}</span>
       </div>
     </section>
     {historyOpen && <section className="decision-history mb-5 rounded-xl border border-zinc-700 bg-zinc-900 p-4">
@@ -474,7 +474,7 @@ export default function DecisionPage() {
         ? "Illustrative example · invented names, IDs and ranks · no Qloo call · not saved"
         : `Decision ${decision.id} · ${decision.source_mode === "replay" ? `Replay of ${decision.replay_of}; no new Qloo call` : "Current decision"} · Saved on this server.`}</p>
       {isSample && <div className="decision-sample-notice" role="note">
-        <strong>Sample brief</strong> · Two fictional Austin venues are choosing an artist-led Thursday pilot for local indie and soul listeners. Every source row below is illustrative; run your own decision for live Qloo evidence.
+        <strong>Illustrative example</strong> · Two fictional Austin venues are choosing an artist-led Thursday pilot. Names, ranks, and source rows are invented. Start your own decision to use live Qloo and run an agent review.
       </div>}
       {!isSample && <div className="mt-3 flex flex-wrap gap-3 text-xs">
         <button disabled={busy} onClick={() => void replayDecision()}
@@ -533,7 +533,7 @@ export default function DecisionPage() {
       {decision.status === "ready" && !isSample && <section className="decision-agent-review" aria-labelledby="agent-review-title">
         <div className="decision-agent-heading">
           <div><h3 id="agent-review-title">Review the pilot choice</h3>
-            <p>A bounded agent inspects this saved Qloo shortlist and venue facts. It can propose a pilot, ask for a missing fact, or abstain. You decide whether to record a selection.</p></div>
+            <p>The agent opens saved Qloo sources and checks your venue rules. It may request one new Qloo comparison if you provide an alternate audience or region. It then proposes a pilot, asks for missing evidence, or declines to recommend. You make the final choice.</p></div>
           <span>{decision.source_mode === "replay" ? "Saved evidence replay" : "Live Qloo decision"}</span>
         </div>
         {decision.source_mode === "live" && <div className="decision-review-context">
