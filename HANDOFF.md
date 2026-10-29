@@ -1,5 +1,55 @@
 # Tastewell handoff for the next chat (2026-10-29)
 
+## Latest checkpoint — release pushed; Lightsail creation pending (2026-10-29)
+
+The user asked to pause because usage is low. Resume the active goal when they
+return. This section supersedes older checkpoint statements below about no
+Git remote, missing browser ownership, or Qloo readiness.
+
+- The Qloo-grounded decision review is implemented and visible in the decision
+  workspace. It runs a bounded tool-calling review, validates evidence and
+  allowed actions, persists the review, and leaves final pilot selection to the
+  human operator. The live browser journey passed with real Qloo and a model
+  on a synthetic brief in the previous turn. See `docs/VALIDATION.md`.
+- Production decisions now belong to a signed, secure browser session. Other
+  browsers cannot list, read, export, replay, mutate, or inspect jobs for that
+  session's decisions. Existing unowned rows are inaccessible in production.
+  The public session test and full non-live backend suite pass: **97 passed,
+  3 deselected**. The legacy `/api/agent/*` routes return 404 in production.
+  Frontend lint/build and five mocked browser tests passed in the previous
+  turn; the opt-in real Qloo/model browser journey passed there too.
+- `graphify update .` completed after code edits (876 nodes, 2,114 edges).
+  Follow `AGENTS.md`: query Graphify before code searches and update after
+  further code edits.
+- The existing public [Spark960/TasteWell](https://github.com/Spark960/TasteWell)
+  repository matches the checkout, so no duplicate was created. The tested
+  release commit `9c325ed` was pushed to `origin/main`. A filename and pattern
+  audit found no staged credential file, private key, SQLite database, or real
+  API key. `git diff --cached --check` passed before the commit.
+- The user supplied a signed-in AWS Mumbai console URL. The Lightsail create
+  form is open in Chrome at `ap-south-1.console.aws.amazon.com/lightsail/webapp/create/instance`.
+  It is configured for **Mumbai, Ubuntu 24.04 LTS, general purpose dual-stack,
+  4 GB RAM / 2 vCPUs / 80 GB SSD, $24/month, one instance named
+  `tastewell-demo`**. Automatic snapshots are off. The default SSH key option
+  is selected; Lightsail says it will create a default key in this region.
+  **No instance has been created.** Browser policy requires the user to perform
+  the final Create instance action because it starts recurring charges. Keep
+  the prepared tab as a handoff; inspect its state again before proceeding.
+- AWS CLI has no configured credentials and local Docker daemon is unavailable.
+  Once the instance exists, finish the Lightsail setup from `DEPLOYMENT.md`:
+  static IP, HTTP/HTTPS firewall, HTTPS hostname (a domain or IP-based
+  `sslip.io` hostname), Docker, cloned release, private `.env`, and Caddy
+  Compose. `SESSION_SECRET` must be a stable random 32+ character value in the
+  private `.env`; the production backend fails fast if missing. Keep Qloo and
+  model keys off GitHub. Verify `/api/qloo/status`, a real decision and agent
+  review, persistence after restart, and the external browser path. The Caddy
+  gate still uses one shared Basic Auth password; supply judge credentials
+  through the submission if this remains the external demo configuration.
+- `DEPLOYMENT.md` still contains older text describing no Git remote, a stale
+  Qloo timeout, and older account credit figures. Update those sections on
+  resumption after the live deployment path is known. A hosted demo has **not**
+  been verified yet. Do not mark the goal complete before that gate.
+
 ## Hackathon requirement and submission status audit (2026-10-29)
 
 The root [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) is now the current status.
