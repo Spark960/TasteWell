@@ -127,6 +127,32 @@ The current implementation therefore does **not** pass the three-benchmark
 Phase 2 gate. Published proxy research cannot supply the missing operational
 facts or the operator review needed to revise these benchmarks.
 
+### 2026-10-29 agent review verification
+
+- A synthetic live `jazz club` brief in Brooklyn with two public artist
+  names required a human concept-tag choice, then produced two options and a
+  complete Qloo artist rank (positions 1 and 2 within one venue call).
+  The bounded model review inspected the proposed option and venue, then
+  returned a cited recommendation. This verifies the local model/Qloo path,
+  not a real venue's suitability or artist availability.
+- A separate synthetic cocktail-bar run reached `needs_input` during artist
+  discovery and produced no options. This is the expected honest stop for
+  that input; it is not evidence that the discovery path is reliable for all
+  audiences.
+- Automated checks cover invalid citations, stale snapshots, replay without
+  new Qloo calls, the one-comparison limit, cancellation, model unavailability,
+  and no selection side effect. The mocked browser journey covers review,
+  sources, and the operator plan handoff at desktop and mobile widths.
+- A fresh visible browser journey on the local build completed concept
+  selection, two-artist Qloo ranking, agent review, source inspection, and
+  reopening the persisted review. Its synthetic jazz-club case produced a
+  cited pilot proposal after inspecting the option and venue. The journey
+  used an isolated temporary SQLite database and did not test hosting.
+- B1 still lacks sound-cutoff, capacity, timing, and fee constraints. B2 still
+  needs exact audience-wording confirmation. B3 remains outside the current
+  artist-led wedge. No independent operator scored these briefs, and no
+  hosted agent journey has been tested.
+
 ## First-decision Qloo probe matrix
 
 Existing contract facts are from `qloo-contract.md`; proposed combinations remain unverified. Use one resolved, consent-safe shortlist and a fixed location/audience for comparisons. Run bounded calls sequentially with spacing, save redacted envelopes, and record status, correlation ID, result IDs, and retrieval time. Never submit private venue or customer records.

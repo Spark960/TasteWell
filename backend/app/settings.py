@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     app_env: str = "dev"
     backend_port: int = 8000
     frontend_port: int = 3000
+    session_secret: str = ""  # Required for signed browser sessions in production.
 
     qloo_api_key: str = ""
     qloo_base_url: str = "https://hackathon.api.qloo.com"

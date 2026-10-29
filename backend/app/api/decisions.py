@@ -7,11 +7,13 @@ Qloo order is preserved only inside each recommendation call.
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Callable, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 from app.qloo.normalizer import NormalizedResult
 
@@ -112,6 +114,32 @@ class ScenarioResult(BaseModel):
     note: str
 
 
+class AgentAction(BaseModel):
+    tool: Literal["inspect_option", "check_venue", "compare_scenario"]
+    arguments: dict[str, Any]
+    outcome: str
+    evidence_ids: list[str] = Field(default_factory=list)
+    scenario_id: str | None = None
+
+
+class AgentReview(BaseModel):
+    id: str = Field(default_factory=lambda: f"review_{uuid.uuid4().hex[:12]}")
+    created_at: str = Field(default_factory=stamp)
+    status: Literal["recommend", "needs_input", "abstain"]
+    snapshot_fingerprint: str
+    source_mode: Literal["live", "replay"]
+    option_id: str | None = None
+    venue_id: str | None = None
+    evidence_ids: list[str] = Field(default_factory=list)
+    scenario_id: str | None = None
+    rationale: str = ""
+    alternatives: list[str] = Field(default_factory=list)
+    unknowns: list[str] = Field(default_factory=list)
+    next_check: str = ""
+    reason: str = ""
+    actions: list[AgentAction] = Field(default_factory=list)
+
+
 class DecisionResult(BaseModel):
     id: str
     source_mode: Literal["live", "replay"] = "live"
@@ -132,6 +160,20 @@ class DecisionResult(BaseModel):
     pilot_plan: PilotPlan | None = None
     outcome: PilotOutcome | None = None
     scenarios: list[ScenarioResult] = Field(default_factory=list)
+    agent_reviews: list[AgentReview] = Field(default_factory=list)
+
+    @computed_field
+    @property
+    def snapshot_fingerprint(self) -> str:
+        return evidence_fingerprint(self)
+
+
+def evidence_fingerprint(decision: DecisionResult) -> str:
+    """Version only the facts an agent may use, never review or UI timestamps."""
+    body = decision.model_dump(include={"source_mode", "request", "venues", "options",
+                                        "evidence", "scenarios", "status"}, mode="json")
+    canonical = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def ledger_rows(operation: str, query: dict, result: NormalizedResult,

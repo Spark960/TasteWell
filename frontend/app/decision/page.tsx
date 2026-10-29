@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { API_BASE } from "@/lib/api";
 import { parseVenueCsv } from "./venueCsv";
+import { sampleDecision } from "./sampleDecision";
 import "./decision.css";
 
 type Evidence = {
@@ -29,9 +30,18 @@ type Scenario = {
   scenario_ranks: Record<string, number | null>;
   evidence_ids: string[]; note: string; created_at: string;
 };
-type Decision = {
+type AgentReview = {
+  id: string; status: "recommend" | "needs_input" | "abstain";
+  snapshot_fingerprint: string; source_mode: "live" | "replay";
+  option_id: string | null; venue_id: string | null; evidence_ids: string[];
+  scenario_id: string | null; rationale: string; alternatives: string[];
+  unknowns: string[]; next_check: string; reason: string;
+  actions: { tool: string; arguments: Record<string, unknown>; outcome: string;
+    evidence_ids: string[]; scenario_id: string | null }[];
+};
+export type Decision = {
   id: string; status: "ready" | "needs_input" | "no_evidence" | "blocked";
-  source_mode?: "live" | "replay"; replay_of?: string | null;
+  source_mode?: "live" | "replay" | "sample"; replay_of?: string | null;
   candidates: { id: string; name?: string; type?: string }[];
   options: Option[]; evidence: Evidence[]; notes: string[];
   selected_option_id: string | null; selected_at: string | null;
@@ -42,6 +52,8 @@ type Decision = {
   resolution_key: string | null;
   request?: { audience: string };
   scenarios?: Scenario[];
+  snapshot_fingerprint?: string;
+  agent_reviews?: AgentReview[];
 };
 type PilotPlan = {
   venue_id: string;
@@ -67,6 +79,24 @@ const initial: Form = {
   live_music_allowed: true,
 };
 
+function describeTagChoice(id: string, name: string) {
+  const tag = id.toLowerCase();
+  if (tag.includes(":category:place:")) return { label: "Place category", guidance: `Choose this if “${name}” describes what the venue is.`, venueType: true };
+  if (tag.includes(":genre:place:")) return { label: "Venue style", guidance: `Choose this if “${name}” describes the venue's style.`, venueType: false };
+  if (tag.includes(":setting:qloo:")) return { label: "Setting", guidance: `Choose this if “${name}” describes the atmosphere.`, venueType: false };
+  if (tag.includes(":activity_type:qloo:")) return { label: "Activity", guidance: `Choose this if “${name}” describes what guests do.`, venueType: false };
+  if (tag.includes(":amenity:qloo:")) return { label: "Amenity", guidance: `Choose this if “${name}” is a feature the venue offers.`, venueType: false };
+  if (tag.includes(":dining_option:qloo:")) return { label: "Dining option", guidance: `Choose this if “${name}” describes a dining service.`, venueType: false };
+  if (tag.includes(":product_service:qloo:")) return { label: "Product or service", guidance: `Choose this if “${name}” describes what the business sells.`, venueType: false };
+  if (tag.includes(":cuisine:qloo:")) return { label: "Food or drink style", guidance: `Choose this only if “${name}” is the intended food or drink signal.`, venueType: false };
+  if (tag.includes(":target_audience:qloo:")) return { label: "Audience", guidance: `Choose this if “${name}” describes the guests rather than the venue.`, venueType: false };
+  if (tag.includes(":industry:qloo:")) return { label: "Industry", guidance: "Choose this for broad business-sector context.", venueType: false };
+  if (tag.includes(":good_for:qloo:")) return { label: "Occasion", guidance: `Choose this if “${name}” describes an occasion.`, venueType: false };
+  if (tag.includes(":keyword:")) return { label: "Listing keyword", guidance: "Choose this for a narrower listing description.", venueType: false };
+  if (tag.includes(":genre:music:")) return { label: "Music genre", guidance: "Choose this if the music style is the core concept.", venueType: false };
+  return { label: "Other Qloo tag", guidance: "Choose this only if it matches the venue concept you intended.", venueType: false };
+}
+
 export default function DecisionPage() {
   const [form, setForm] = useState<Form>(initial);
   const [extraVenues, setExtraVenues] = useState<{
@@ -77,6 +107,10 @@ export default function DecisionPage() {
   const [busy, setBusy] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [jobStage, setJobStage] = useState("");
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [reviewJobId, setReviewJobId] = useState<string | null>(null);
+  const [reviewStage, setReviewStage] = useState("");
+  const [reviewAlternate, setReviewAlternate] = useState({ audience: "", region: "" });
   const activeJob = useRef<string | null>(null);
   const [error, setError] = useState("");
   const [history, setHistory] = useState<SavedDecision[]>([]);
@@ -94,6 +128,22 @@ export default function DecisionPage() {
     metric: "Attendance", baseline_value: "", actual_value: "",
     unit: "people", period: "One pilot event", source: "", notes: "",
   });
+  const isSample = decision?.source_mode === "sample";
+
+  function showSample() {
+    setDecision(sampleDecision);
+    setPendingOption(null);
+    setHistoryOpen(false);
+    setError("");
+    setJobStage("");
+    requestAnimationFrame(() => document.getElementById("decision-options")?.scrollIntoView({ behavior: "smooth" }));
+  }
+
+  function closeSample() {
+    setDecision(null);
+    setError("");
+    requestAnimationFrame(() => document.getElementById("decision-brief")?.scrollIntoView({ behavior: "smooth" }));
+  }
 
   async function importVenues(file?: File) {
     if (!file) return;
@@ -202,7 +252,7 @@ export default function DecisionPage() {
   }
 
   async function select(optionId: string) {
-    if (!decision) return;
+    if (!decision || isSample) return;
     setBusy(true); setError("");
     try {
       const response = await fetch(`${API_BASE}/api/decisions/${decision.id}/select/${optionId}`, {
@@ -220,7 +270,7 @@ export default function DecisionPage() {
   }
 
   async function recordOutcome() {
-    if (!decision) return;
+    if (!decision || isSample) return;
     setBusy(true); setError("");
     try {
       const response = await fetch(`${API_BASE}/api/decisions/${decision.id}/outcome`, {
@@ -238,7 +288,7 @@ export default function DecisionPage() {
   }
 
   async function compareScenario() {
-    if (!decision) return;
+    if (!decision || isSample) return;
     const venue = decision.venues.find((item) => item.id === scenarioInput.venue_id)
       || decision.venues.find((item) => item.live_music_allowed);
     if (!venue) return;
@@ -257,8 +307,54 @@ export default function DecisionPage() {
     finally { setBusy(false); }
   }
 
+  async function reviewPilot() {
+    if (!decision || isSample || !decision.snapshot_fingerprint) return;
+    if (reviewAlternate.audience.trim() && reviewAlternate.region.trim()) {
+      setError("Choose either an alternate audience or an alternate region for the review.");
+      return;
+    }
+    setReviewBusy(true); setError(""); setReviewStage("Starting review…");
+    try {
+      const alternate_audience = reviewAlternate.audience.trim() || null;
+      const alternate_region = reviewAlternate.region.trim() || null;
+      const venue = scenarioVenue ?? decision.venues.find((item) => item.live_music_allowed);
+      const response = await fetch(`${API_BASE}/api/decisions/${decision.id}/agent-reviews`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ snapshot_fingerprint: decision.snapshot_fingerprint,
+          scenario_venue_id: (alternate_audience || alternate_region) ? venue?.id : null,
+          alternate_audience, alternate_region }),
+      });
+      if (!response.ok) throw new Error(`Review could not start (${response.status}): ${await response.text()}`);
+      const started = await response.json() as { review_id: string };
+      setReviewJobId(started.review_id);
+      for (;;) {
+        await new Promise((resolve) => setTimeout(resolve, 700));
+        const poll = await fetch(`${API_BASE}/api/decisions/${decision.id}/agent-reviews/${started.review_id}`);
+        if (!poll.ok) throw new Error(`Could not check review progress (${poll.status})`);
+        const state = await poll.json() as { status: string; stage: string; error: string | null };
+        setReviewStage(state.stage);
+        if (state.status === "done") {
+          const refreshed = await fetch(`${API_BASE}/api/decisions/${decision.id}`);
+          if (!refreshed.ok) throw new Error("Review finished, but the decision could not be reopened.");
+          setDecision(await refreshed.json() as Decision);
+          break;
+        }
+        if (state.status === "cancelled") break;
+        if (state.status === "error") throw new Error(state.error || "Review unavailable");
+      }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { setReviewBusy(false); setReviewJobId(null); }
+  }
+
+  async function cancelReview() {
+    if (!decision || !reviewJobId) return;
+    const response = await fetch(`${API_BASE}/api/decisions/${decision.id}/agent-reviews/${reviewJobId}`, { method: "DELETE" });
+    if (!response.ok) setError(`Could not cancel review (${response.status})`);
+    else setReviewStage("Cancellation requested");
+  }
+
   async function replayDecision() {
-    if (!decision) return;
+    if (!decision || isSample) return;
     setBusy(true); setError("");
     try {
       const response = await fetch(`${API_BASE}/api/decisions/${decision.id}/replay`, {
@@ -280,14 +376,12 @@ export default function DecisionPage() {
   ];
   const scenarioVenue = decision?.venues.find((venue) => venue.id === scenarioInput.venue_id)
     ?? decision?.venues.find((venue) => venue.live_music_allowed);
+  const latestReview = decision?.agent_reviews?.at(-1);
+  const reviewStale = Boolean(latestReview && latestReview.snapshot_fingerprint !== decision?.snapshot_fingerprint);
 
   return <div className="decision-shell">
     <header className="decision-topbar">
       <Link href="/" className="decision-brand" aria-label="Tastewell home"><span className="decision-brand-mark">t<span>.</span></span><span>tastewell</span></Link>
-      <nav className="decision-nav" aria-label="Main navigation">
-        <Link href="/" aria-current="page">Decisions</Link>
-        <Link href="/compare">Compare Qloo</Link>
-      </nav>
       <button onClick={() => void loadHistory()} className="decision-history-button">Saved decisions</button>
     </header>
     <div className="decision-layout">
@@ -310,6 +404,12 @@ export default function DecisionPage() {
       <h1>Make the next night count.</h1>
       <p>Find an artist-led pilot that fits your audience and your venues. Keep the evidence and the operational questions together as you decide.</p>
       <div className="decision-scope"><span className="decision-scope-dot" />Currently exploring <strong>live music</strong> <span aria-hidden="true">·</span> Up to 10 venues</div>
+      <div className="decision-example-action">
+        <button type="button" onClick={isSample ? closeSample : showSample}>
+          {isSample ? "Start your own decision" : "See an illustrative decision"}
+        </button>
+        <span>{isSample ? "The example uses invented names and IDs; no Qloo call was made." : "Opens instantly with a sample pilot and rank-changing scenario."}</span>
+      </div>
     </section>
     {historyOpen && <section className="decision-history mb-5 rounded-xl border border-zinc-700 bg-zinc-900 p-4">
       <h2 className="font-semibold">Recent decisions</h2>
@@ -320,7 +420,7 @@ export default function DecisionPage() {
           {item.venue_name} · {item.concept} · {item.region}
           <span className="block text-xs text-zinc-500">{item.source_mode === "replay" ? "Replay · " : ""}{item.has_outcome ? "Outcome recorded" : item.selected_option_id ? "Pilot selected" : item.status} · {item.updated_at}</span>
         </button>)}</div></section>}
-    <form id="decision-brief" onSubmit={(event) => { event.preventDefault(); void create(); }} className="decision-form rounded-xl border border-zinc-700 bg-zinc-900 p-5">
+    {!isSample && <form id="decision-brief" onSubmit={(event) => { event.preventDefault(); void create(); }} className="decision-form rounded-xl border border-zinc-700 bg-zinc-900 p-5">
       <div className="decision-form-heading"><div><h2>Shape your pilot brief</h2><p>Start with the venue and the people you want to reach.</p></div><span>01 / Brief</span></div>
       <div className="grid gap-4 sm:grid-cols-2">{fields.map(({ key, label, placeholder }) =>
         <label key={key} className="text-sm text-zinc-300">{label}
@@ -366,33 +466,50 @@ export default function DecisionPage() {
       {jobId && <button type="button" onClick={() => void cancelCreate()}
         className="ml-3 rounded-md border border-zinc-600 px-4 py-2 text-sm">Cancel decision</button>}
       {jobStage && <p role="status" className="mt-2 text-xs text-zinc-400">{jobStage}</p>}
-    </form>
+    </form>}
     {error && <p role="alert" className="mt-5 rounded-md border border-red-700 p-3 text-red-300">{error}</p>}
     {decision && <section id="decision-options" className="decision-results mt-8" aria-live="polite">
       <h2 className="text-xl font-semibold">{decision.status === "ready" ? "Pilot options" : "Decision needs attention"}</h2>
-      <p className="mt-1 text-xs text-zinc-500">Decision {decision.id} · {decision.source_mode === "replay"
-        ? `Replay of ${decision.replay_of}; no new Qloo call` : "Current decision"} · Saved on this server.</p>
-      <div className="mt-3 flex flex-wrap gap-3 text-xs">
+      <p className="mt-1 text-xs text-zinc-500">{isSample
+        ? "Illustrative example · invented names, IDs and ranks · no Qloo call · not saved"
+        : `Decision ${decision.id} · ${decision.source_mode === "replay" ? `Replay of ${decision.replay_of}; no new Qloo call` : "Current decision"} · Saved on this server.`}</p>
+      {isSample && <div className="decision-sample-notice" role="note">
+        <strong>Sample brief</strong> · Two fictional Austin venues are choosing an artist-led Thursday pilot for local indie and soul listeners. Every source row below is illustrative; run your own decision for live Qloo evidence.
+      </div>}
+      {!isSample && <div className="mt-3 flex flex-wrap gap-3 text-xs">
         <button disabled={busy} onClick={() => void replayDecision()}
           className="rounded-md border border-zinc-600 px-3 py-2">Replay saved evidence</button>
         <a href={`${API_BASE}/api/decisions/${decision.id}/export`}
           className="rounded-md border border-zinc-600 px-3 py-2">Export decision JSON</a>
-      </div>
+      </div>}
       {decision.notes.map((note, i) => <p key={i} className="mt-2 text-sm text-zinc-300">{note}</p>)}
-      {decision.status === "needs_input" && <div className="mt-4 rounded-lg border border-amber-700 p-4">
+      {decision.status === "needs_input" && <div className="decision-choice-panel mt-4 rounded-lg border border-amber-700 p-4">
         <h3 className="font-medium">{decision.resolution_kind === "artist"
           ? `Choose the intended artist for ${decision.resolution_key}`
           : "Choose the intended concept tag"}</h3>
-        <div className="mt-3 flex flex-wrap gap-2">{decision.candidates.map((candidate) =>
-          <button key={candidate.id} disabled={busy} onClick={() => void create(candidate.id)}
-            className="rounded-md border border-zinc-600 px-3 py-2 text-left text-sm hover:border-amber-400">
-            {candidate.name || candidate.id}<span className="block text-xs text-zinc-500">{candidate.type}</span></button>)}</div>
+        <p className="decision-choice-help">{decision.resolution_kind === "artist"
+          ? "Qloo found more than one artist record. Confirm the intended act; if names are identical, the record IDs are the only distinction currently available."
+          : "These matches represent different things. Pick the one that describes your venue concept; that tag will guide the artist and brand search."}</p>
+        <div className="decision-choice-grid">{decision.candidates.map((candidate) => {
+          const display = describeTagChoice(candidate.id, candidate.name || "this match");
+          return <button key={candidate.id} disabled={busy} onClick={() => void create(candidate.id)}
+            className={`decision-choice ${decision.resolution_kind === "tag" && display.venueType ? "is-venue-type" : ""}`}>
+            <span className="decision-choice-name">{candidate.name || "Unnamed Qloo match"}</span>
+            {decision.resolution_kind === "tag" ? <>
+              <span className="decision-choice-kind">{display.label}{display.venueType ? " · venue-type match" : ""}</span>
+              <span className="decision-choice-guidance">{display.guidance}</span>
+            </> : <>
+              <span className="decision-choice-kind">Artist record</span>
+              <span className="decision-choice-guidance">Record ID: {candidate.id}</span>
+            </>}
+          </button>;
+        })}</div>
       </div>}
       <div className="decision-options-grid mt-5 grid gap-4 md:grid-cols-3">{decision.options.map((option, index) =>
         <article key={option.id} className="decision-option rounded-xl border border-zinc-700 bg-zinc-900 p-4">
           <div className="decision-option-top"><span>Option {String(index + 1).padStart(2, "0")}</span><span>{option.evidence_ids.length} sources</span></div>
           <h3 className="font-semibold">{option.title}</h3><p className="mt-2 text-sm">{option.description}</p>
-          {option.artist_rank && <p className="mt-2 text-xs text-amber-300">Artist #{option.artist_rank} within this Qloo shortlist</p>}
+          {option.artist_rank && <p className="mt-2 text-xs text-amber-300">Artist #{option.artist_rank} within this {isSample ? "illustrative" : "Qloo"} shortlist</p>}
           {decision.venues.length > 1 && <div className="mt-3 border-t border-zinc-700 pt-3 text-xs">
             <p className="font-medium text-zinc-300">Venue comparison · rank within each separate call</p>
             {decision.venues.map((venue) => <p key={venue.id} className="mt-1 text-zinc-400">
@@ -402,22 +519,76 @@ export default function DecisionPage() {
           <p className="mt-4 text-xs uppercase tracking-wide text-zinc-500">What is unknown</p>
           <ul className="mt-1 list-inside list-disc text-sm text-zinc-300">{option.unknowns.map((item) => <li key={item}>{item}</li>)}</ul>
           <p className="mt-3 text-xs text-zinc-400">{option.constraint_notes.join(" ")}</p>
-          <details className="mt-4 text-xs"><summary className="cursor-pointer text-amber-300">Inspect Qloo evidence</summary>
+          <details className="mt-4 text-xs"><summary className="cursor-pointer text-amber-300">Inspect {isSample ? "illustrative source rows" : "Qloo evidence"}</summary>
             {option.evidence_ids.map((id) => { const row = decision.evidence.find((e) => e.id === id);
-              return row && <div key={id} className="mt-2 break-words border-t border-zinc-700 pt-2">
+              return row && <div id={`evidence-${id}`} key={id} className="mt-2 break-words border-t border-zinc-700 pt-2">
                 <strong>{row.name || row.source_id}</strong> · {row.operation} · {row.status}
                 <div>ID: {row.source_id}</div><div>Affinity: {row.affinity ?? "not provided"}</div>
                 <div>Query: {JSON.stringify(row.query)}</div><div>Correlation: {row.correlation_id || "not provided"}</div>
                 <div>Retrieved: {row.retrieved_at}</div></div>; })}</details>
-          <button onClick={() => setPendingOption(option.id)} disabled={busy}
+          {isSample ? decision.selected_option_id === option.id && <span className="decision-sample-selection">Sample pilot selected</span> : <button onClick={() => setPendingOption(option.id)} disabled={busy}
             className="mt-4 rounded-md border border-amber-400 px-3 py-2 text-sm text-amber-300 disabled:opacity-50">
-            {decision.selected_option_id === option.id ? "Selected · edit plan" : "Plan this pilot"}</button>
+            {decision.selected_option_id === option.id ? "Selected · edit plan" : "Plan this pilot"}</button>}
         </article>)}</div>
+      {decision.status === "ready" && !isSample && <section className="decision-agent-review" aria-labelledby="agent-review-title">
+        <div className="decision-agent-heading">
+          <div><h3 id="agent-review-title">Review the pilot choice</h3>
+            <p>A bounded agent inspects this saved Qloo shortlist and venue facts. It can propose a pilot, ask for a missing fact, or abstain. You decide whether to record a selection.</p></div>
+          <span>{decision.source_mode === "replay" ? "Saved evidence replay" : "Live Qloo decision"}</span>
+        </div>
+        {decision.source_mode === "live" && <div className="decision-review-context">
+          <p>Optional: test one context change during the review. Leave both blank to review the current evidence.</p>
+          <label>Venue
+            <select value={scenarioVenue?.id || ""} onChange={(event) => setScenarioInput({ ...scenarioInput, venue_id: event.target.value })}>
+              {decision.venues.filter((venue) => venue.live_music_allowed).map((venue) => <option key={venue.id} value={venue.id}>{venue.name}</option>)}
+            </select>
+          </label>
+          <label>Alternate audience
+            <input value={reviewAlternate.audience} onChange={(event) => setReviewAlternate({ audience: event.target.value, region: "" })} placeholder="Optional audience wording" />
+          </label>
+          <label>Alternate region
+            <input value={reviewAlternate.region} onChange={(event) => setReviewAlternate({ audience: "", region: event.target.value })} placeholder="Optional region" />
+          </label>
+        </div>}
+        <div className="decision-review-actions">
+          <button type="button" className="decision-primary" disabled={busy || reviewBusy} onClick={() => void reviewPilot()}>{reviewBusy ? "Reviewing…" : "Review the pilot choice"}</button>
+          {reviewBusy && <button type="button" onClick={() => void cancelReview()}>Cancel review</button>}
+          {reviewBusy && <span role="status">{reviewStage}</span>}
+        </div>
+        {latestReview && <div className="decision-review-result" aria-live="polite">
+          <p className="decision-review-status">{reviewStale ? "Earlier review · evidence has changed" : latestReview.status === "recommend" ? "Agent proposal · operator approval needed" : latestReview.status === "needs_input" ? "Agent needs input" : "Agent abstained"}</p>
+          {latestReview.status === "recommend" ? <>
+            <h4>{decision.options.find((option) => option.id === latestReview.option_id)?.title} at {decision.venues.find((venue) => venue.id === latestReview.venue_id)?.name}</h4>
+            <p>{latestReview.rationale}</p>
+            <p className="decision-review-interpretation">Agent interpretation. Qloo sources and operator facts are listed below; booking and cost remain unverified.</p>
+            <div className="decision-review-facts"><strong>Qloo sources used</strong>
+              {latestReview.evidence_ids.map((id) => { const row = decision.evidence.find((item) => item.id === id);
+                return row && <a key={id} href={`#evidence-${id}`} onClick={() => {
+                  document.getElementById(`evidence-${id}`)?.closest("details")?.setAttribute("open", "");
+                }}>{row.name || row.source_id || id} · {row.operation} · {row.status}</a>; })}
+            </div>
+            {latestReview.scenario_id && <p>Requested a fixed-shortlist comparison. <a href={`#scenario-${latestReview.scenario_id}`}>Inspect rank movement</a>.</p>}
+            {latestReview.alternatives.length > 0 && <p>Alternatives considered: {latestReview.alternatives.map((id) => decision.options.find((item) => item.id === id)?.title || id).join(", ")}.</p>}
+            <p><strong>Still unknown:</strong> {latestReview.unknowns.join("; ")}.</p>
+            <p><strong>Next check:</strong> {latestReview.next_check}</p>
+            {!reviewStale && <button type="button" className="decision-primary" onClick={() => {
+              setPendingOption(latestReview.option_id); setPilot((current) => ({ ...current, venue_id: latestReview.venue_id || "" }));
+              requestAnimationFrame(() => document.getElementById("pilot-plan")?.scrollIntoView({ behavior: "smooth" }));
+            }}>Choose this pilot</button>}
+          </> : <p>{latestReview.reason}</p>}
+          <details><summary>What the agent checked</summary><ul>{latestReview.actions.map((action, index) => <li key={`${action.tool}-${index}`}>
+            {action.tool === "inspect_option" ? "Inspected an option and its saved Qloo rows" : action.tool === "check_venue" ? "Checked operator venue constraints" : "Requested a changed-context Qloo rank"} · {action.outcome}
+            <details><summary>Tool arguments and source IDs</summary><pre>{JSON.stringify({ arguments: action.arguments, evidence_ids: action.evidence_ids, scenario_id: action.scenario_id }, null, 2)}</pre></details>
+          </li>)}</ul></details>
+        </div>}
+      </section>}
       {decision.status === "ready" && decision.options.some((option) => option.artist_rank) &&
         <section className="decision-scenario mt-6 rounded-xl border border-zinc-700 bg-zinc-900 p-5">
           <h3 className="font-semibold">Scenario comparison</h3>
-          <p className="mt-1 text-sm text-zinc-400">Keep the artist IDs fixed and change one audience or region. Each rank is within its own Qloo call.</p>
-          <form onSubmit={(event) => { event.preventDefault(); void compareScenario(); }}
+          <p className="mt-1 text-sm text-zinc-400">{isSample
+            ? "This invented example holds the artist IDs fixed and changes the audience. A live comparison makes a separate Qloo call."
+            : "Keep the artist IDs fixed and change one audience or region. Each rank is within its own Qloo call."}</p>
+          {!isSample && <form onSubmit={(event) => { event.preventDefault(); void compareScenario(); }}
             className="mt-4 grid gap-3 sm:grid-cols-3">
             <label className="text-sm">Venue
               <select value={scenarioVenue?.id || ""}
@@ -439,9 +610,9 @@ export default function DecisionPage() {
                 className="mt-1 block w-full rounded-md border border-zinc-600 bg-zinc-950 p-2" />
             </label>
             <button disabled={busy} className="rounded-md bg-amber-400 px-4 py-2 font-semibold text-zinc-950 disabled:opacity-50">Compare scenario</button>
-          </form>
+          </form>}
           {(decision.scenarios || []).slice().reverse().map((scenario) =>
-            <div key={scenario.id} className="mt-5 border-t border-zinc-700 pt-4 text-sm">
+            <div id={`scenario-${scenario.id}`} key={scenario.id} className="mt-5 border-t border-zinc-700 pt-4 text-sm">
               <p className="font-medium">{decision.venues.find((venue) => venue.id === scenario.venue_id)?.name} · {scenario.status === "ready" ? "Ranked" : "Rank unavailable"}</p>
               <p className="mt-1 text-zinc-400">{scenario.note}</p>
               <div className="mt-3 overflow-x-auto"><table className="w-full text-left text-xs">
@@ -461,7 +632,7 @@ export default function DecisionPage() {
               </details>
             </div>)}
         </section>}
-      {pendingOption && <form onSubmit={(event) => { event.preventDefault(); void select(pendingOption); }}
+      {pendingOption && !isSample && <form id="pilot-plan" onSubmit={(event) => { event.preventDefault(); void select(pendingOption); }}
         className="decision-plan mt-6 rounded-xl border border-amber-700 bg-zinc-900 p-5">
         <h3 className="text-lg font-semibold">Record the pilot</h3>
         <p className="mt-1 text-sm text-zinc-400">Use your own operational facts. Qloo does not provide booking, cost, or outcome data.</p>
@@ -493,8 +664,9 @@ export default function DecisionPage() {
         <button disabled={busy} className="mt-4 rounded-md bg-amber-400 px-4 py-2 font-semibold text-zinc-950">Record selection</button>
       </form>}
       {decision.selected_option_id && <p className="mt-5 rounded-md border border-green-700 p-3 text-sm text-green-300">
-        Selection recorded for {decision.venues.find((venue) => venue.id === decision.pilot_plan?.venue_id)?.name} on {decision.pilot_plan?.target_date}. Owner: {decision.pilot_plan?.owner}. Next: {decision.pilot_plan?.next_action}.</p>}
-      {decision.selected_option_id && <div className="decision-outcome mt-5 rounded-xl border border-zinc-700 bg-zinc-900 p-5">
+        {isSample ? "Illustrative pilot plan" : "Selection recorded"} for {decision.venues.find((venue) => venue.id === decision.pilot_plan?.venue_id)?.name} on {decision.pilot_plan?.target_date}. Owner: {decision.pilot_plan?.owner}. Next: {decision.pilot_plan?.next_action}.</p>}
+      {isSample && decision.pilot_plan && <p className="decision-sample-plan">Success measure: {decision.pilot_plan.success_measure}. Baseline: {decision.pilot_plan.baseline}. Cost assumption: {decision.pilot_plan.cost_assumption}. No event or outcome has occurred in this example.</p>}
+      {decision.selected_option_id && !isSample && <div className="decision-outcome mt-5 rounded-xl border border-zinc-700 bg-zinc-900 p-5">
         <h3 className="font-semibold">Pilot outcome</h3>
         <p className="mt-1 text-sm text-zinc-400">Enter aggregated results from your own records. A difference from baseline does not establish that this program caused it.</p>
         {decision.outcome && <p className="mt-3 text-sm text-green-300">Recorded: {decision.outcome.metric} {decision.outcome.baseline_value} → {decision.outcome.actual_value} {decision.outcome.unit} ({decision.outcome.period}). Source: {decision.outcome.source}.</p>}

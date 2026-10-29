@@ -18,7 +18,7 @@ Tastewell combines Qloo's aggregate cultural signals with venue-specific operati
 An operator supplies a venue concept, audience, objective, one or more venues, permission and budget constraints, and optionally an artist shortlist. They compare a small set of pilot options, inspect evidence and unknowns, test an audience or region change, choose a pilot, then record the plan and outcome from their own records.
 
 ## Capabilities and Constraints
-- The programming decision workspace is the primary experience. The earlier grounded-versus-generic brief comparison remains accessible as a secondary demo.
+- The programming decision workspace at `/` and `/decision` is the product experience. Qloo's contribution is shown in option evidence and fixed-shortlist scenario comparisons.
 - The current decision slice covers artist-led live music, up to ten venues and five supplied artist names.
 - Ranks are comparable only within each venue's Qloo shortlist call. Qloo does not establish availability, fees, staffing, licensing, sales forecasts, or causal impact.
 - Known costs above a venue's budget ceiling are rejected. Unknown costs remain unverified.

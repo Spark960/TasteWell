@@ -5,7 +5,7 @@ Tastewell is a curated field guide for practical hospitality decisions. It shoul
 ## Surface
 
 - Primary route: `/`, the programming decision workspace. `/decision` remains a direct link to the same workspace.
-- Secondary route: `/compare`, the original grounded versus generic brief demonstration.
+- `/decision` is a direct link to the same workspace. There is no separate comparison page.
 - Mode: operate. Dense evidence, editable plans, and changing states take priority over decoration.
 
 ## Visual language

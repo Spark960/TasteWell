@@ -84,7 +84,7 @@ test("operator resolves evidence, plans a pilot, records outcome, and reopens it
   await page.getByLabel("Audience").fill("millennials");
   await page.getByRole("button", { name: "Explore options" }).click();
   await expect(page.getByText("Choose the intended concept tag")).toBeVisible();
-  await page.getByRole("button", { name: /Jazz genre:music/ }).click();
+  await page.getByRole("button", { name: /Jazz Music genre/ }).click();
   await expect(page.getByText("Pilot an early set with First Act at The Room.")).toBeVisible();
   await page.getByText("Inspect Qloo evidence").click();
   await expect(page.getByText("ID: artist-1").first()).toBeVisible();
@@ -190,7 +190,7 @@ test("operator shortlist compares eligible venues and resolves an artist", async
   await page.getByLabel("Your artist shortlist").fill("First Act\nSecond Act");
   await page.getByRole("button", { name: "Explore options" }).click();
   await expect(page.getByText("Choose the intended artist for First Act")).toBeVisible();
-  await page.getByRole("button", { name: /First Act artist/ }).last().click();
+  await page.getByRole("button", { name: /First Act Artist record/ }).last().click();
   await expect(page.getByText("Venue comparison · rank within each separate call")).toBeVisible();
   await expect(page.getByText("First Room: artist #2")).toBeVisible();
   await expect(page.getByText("Second Room: artist #1")).toBeVisible();
@@ -236,4 +236,56 @@ test("operator can cancel an in-flight decision job", async ({ page }) => {
   await expect(page.getByText("Cancellation requested")).toBeVisible();
   await expect(page.getByRole("button", { name: "Explore options" })).toBeEnabled();
   await expect.poll(() => cancelled).toBe(true);
+});
+
+test("agent review shows sourced proposal and leaves pilot selection to the operator", async ({ page }) => {
+  const review = {
+    id: "review-1", status: "recommend", snapshot_fingerprint: "fingerprint-1",
+    source_mode: "live", option_id: "opt-1", venue_id: "v1", evidence_ids: ["ev-artist"],
+    scenario_id: null, rationale: "Test the early set as the first pilot.",
+    alternatives: [], unknowns: ["Artist availability and fee"], next_check: "Verify artist availability and fee.",
+    reason: "", actions: [
+      { tool: "inspect_option", arguments: { option_id: "opt-1" }, outcome: "ok", evidence_ids: ["ev-artist"], scenario_id: null },
+      { tool: "check_venue", arguments: { venue_id: "v1" }, outcome: "ok", evidence_ids: [], scenario_id: null },
+    ],
+  };
+  let saved = {
+    id: "dec-review", status: "ready", source_mode: "live", snapshot_fingerprint: "fingerprint-1",
+    candidates: [], options: [{ ...option, venue_ranks: { v1: 1 } }], evidence, notes: [],
+    selected_option_id: null, selected_at: null, pilot_plan: null, outcome: null,
+    venues: [{ id: "v1", name: "The Room", region: "Brooklyn", live_music_allowed: true, budget_limit: 500 }],
+    resolution_kind: null, resolution_key: null, request: { audience: "millennials" },
+    scenarios: [], agent_reviews: [] as typeof review[],
+  };
+  await page.route("**/api/**", async (route) => {
+    const url = route.request().url();
+    if (url.endsWith("/api/decisions")) {
+      await route.fulfill({ json: [{ id: saved.id, venue_name: "The Room", concept: "jazz", region: "Brooklyn", status: "ready", selected_option_id: null, has_outcome: false, updated_at: "2026-10-29" }] });
+    } else if (url.endsWith("/agent-reviews") && route.request().method() === "POST") {
+      expect(route.request().postDataJSON().snapshot_fingerprint).toBe("fingerprint-1");
+      await route.fulfill({ status: 202, json: { review_id: review.id } });
+    } else if (url.endsWith(`/agent-reviews/${review.id}`)) {
+      saved = { ...saved, agent_reviews: [review] };
+      await route.fulfill({ json: { review_id: review.id, status: "done", stage: "complete", review } });
+    } else if (url.endsWith("/api/decisions/dec-review")) {
+      await route.fulfill({ json: saved });
+    } else {
+      await route.fulfill({ status: 404, body: "Unexpected request" });
+    }
+  });
+  await page.goto("/decision");
+  await page.getByRole("button", { name: "Saved decisions" }).click();
+  await page.getByRole("button", { name: /The Room.*jazz/ }).click();
+  await page.getByRole("button", { name: "Review the pilot choice" }).click();
+  await expect(page.getByText("Agent proposal · operator approval needed")).toBeVisible();
+  await expect(page.getByText("Verify artist availability and fee.")).toBeVisible();
+  await expect(page.getByRole("link", { name: /First Act · recommend/ })).toBeVisible();
+  await expect(page.getByText("Selection recorded", { exact: false })).toHaveCount(0);
+  await page.screenshot({ path: "test-results/agent-review.png", fullPage: true });
+  await page.getByRole("button", { name: "Choose this pilot" }).click();
+  await expect(page.getByLabel("Pilot venue")).toHaveValue("v1");
+  await expect(page.getByLabel("Owner")).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: "test-results/agent-review-mobile.png", fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 });

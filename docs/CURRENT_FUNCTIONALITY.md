@@ -8,7 +8,7 @@ features. `IMPLEMENTATION.md` records the earlier hackathon build history;
 
 ## What a user can do today
 
-**Experimental decision workspace:** `/decision` accepts a venue concept,
+**Decision workspace:** `/` and `/decision` accept a venue concept,
 audience, objective, up to ten venues with live-music and budget inputs, and
 up to five operator-supplied artist names. The venue list can be populated
 from a validated four-column CSV
@@ -45,136 +45,115 @@ local development or a password-protected private preview.
 This slice does not verify booking availability, fee, staffing, licensing,
 attendance, revenue, or causal impact.
 
-**Existing brief demo:**
+The landing view also offers an instant, read-only illustrative decision.
+It uses invented names, `urn:sample` IDs, source rows, ranks, a changed-audience
+scenario, and a sample pilot plan. It makes no Qloo call or server write and
+does not claim a real event or outcome. The live concept chooser labels tag
+types in operator language, visually distinguishes a place-category match,
+and still requires a human choice. For ambiguous artist records with the
+same name, only their IDs currently distinguish the choices.
 
-1. Choose one of nine venue presets or type a venue concept, region/catchment,
-   and target audience. Presets fill the form; they do not submit it.
-2. Click **Run both panes**. The browser starts a grounded Qloo run and a
-   generic LLM-only run concurrently.
-3. Watch run status and a merged live trace. The grounded pane shows MCP
-   connection, model steps, Qloo calls, envelope statuses, and completion.
-4. Read a concept brief with audience profile, menu tilt, music/programming,
-   adjacent brands, tag themes, and honest absences. Citation IDs in section
-   strings are associated with evidence chips when they match recorded IDs.
-5. If Qloo returns an ambiguous candidate set, pick an entity/tag and re-run
-   that pane with the chosen ID. Stop aborts browser stream consumption; the
-   backend run itself continues until completion or timeout.
+The standalone grounded-versus-generic brief page has been removed after
+the 2026-10-28 live browser check. The product demonstrates Qloo's role with
+source rows and changed-context ranks inside the decision workspace. The
+older `/api/agent/*` backend path remains as an internal development harness
+pending a dependency audit; no product route calls it.
 
-The generic pane illustrates what the model says without Qloo. It is a
-demonstration aid, not a required part of the grounded workflow. That demo
-has no save, share, revise, compare-options, or export journey.
+**Agent review (2026-10-29):** A ready live decision or saved-evidence replay
+can start one bounded pilot review from the workspace. The model can inspect
+saved option rows, check operator-supplied venue facts, and request one new
+fixed-shortlist Qloo rank only for an operator-confirmed alternate audience
+or region on a live decision. Replays cannot make a new Qloo call. A review
+uses at most four model turns and a 90-second total budget, can be cancelled,
+and saves its action record and evidence fingerprint in SQLite and JSON
+exports. A recommendation requires a successful artist source, inspection of
+the chosen option, and a check of the chosen eligible venue. The server
+constructs its factual rationale from validated rows and constrains the next
+check to an existing unknown. Invalid model output gets one repair attempt,
+then an explicit abstention. An unavailable model leaves the deterministic
+options intact. An older review is marked stale when evidence or scenarios
+change; selecting a pilot still requires the operator's explicit plan form.
+The invented instant example has no agent review.
 
 ## Runtime path
 
 ```mermaid
 flowchart LR
-  Form[Next.js brief form] --> Client[Typed fetch and SSE client]
-  Client --> API[FastAPI run and stream routes]
-  API --> Engine[In-memory run registry and executor]
-  Engine --> Agent[AgentRunner]
-  Agent --> LLM[OpenAI-compatible model provider]
-  Agent --> Tools[GroundedTools]
-  Tools --> MCP[Qloo MCP stdio client]
-  MCP --> Harness[qloo mcp harness]
-  Engine --> Trace[SSE trace and run summary]
-  Trace --> Client
+  Form[Next.js decision workspace] --> Jobs[Cancellable decision jobs]
+  Jobs --> Stages[Resolve, discover, rank]
+  Stages --> MCP[Qloo MCP stdio client]
+  MCP --> Harness[Qloo harness]
+  Stages --> Store[SQLite decision and evidence snapshot]
+  Store --> UI[Options, scenario, pilot and outcome]
 ```
 
-- Frontend: `frontend/app/TastewellApp.tsx`, `components/BriefForm.tsx`,
-  `components/ResultPane.tsx`, `components/TracePanel.tsx`, and `lib/api.ts`.
-- HTTP API: `POST /api/agent/run`, `GET /api/agent/stream/{run_id}`,
-  `GET /api/agent/runs/{run_id}`, `GET /api/health`, and
-  `GET /api/qloo/status` in `backend/app/api/routes.py`.
+- Frontend: `frontend/app/decision/page.tsx`,
+  `frontend/app/decision/venueCsv.ts`, and `frontend/lib/api.ts`.
+- Product HTTP API: `/api/decisions` and `/api/decision-jobs` in
+  `backend/app/api/routes.py` and `backend/app/api/decisions.py`.
 - Decision jobs: `POST /api/decision-jobs`, `GET`/`DELETE`
   `/api/decision-jobs/{job_id}`, and
   `POST /api/decisions/{id}/resolve-jobs`. Completed decisions persist;
   in-flight job status is in memory and disappears on restart.
 - Scenario comparison: `POST /api/decisions/{id}/scenarios` reranks one saved
   shortlist for a changed audience or region and persists its evidence.
+- Agent review: `POST /api/decisions/{id}/agent-reviews` starts an in-memory
+  job; `GET`/`DELETE /api/decisions/{id}/agent-reviews/{review_id}` inspect or
+  cancel it. Completed reviews persist with the decision and reopen after a
+  restart.
 - Snapshot tools: `GET /api/decisions/{id}/export` downloads the decision;
   `POST /api/decisions/{id}/replay` copies its evidence into a new labeled
   decision without a Qloo call.
-- Execution: `backend/app/api/engine.py` creates one async task per brief run,
-  starts Qloo MCP for grounded mode, and keeps brief state in process memory.
-  The separate decision path in `backend/app/api/decisions.py` runs explicit
-  Qloo stages and saves snapshots through `backend/app/api/decision_store.py`.
-- Agent: `backend/app/agent/loop.py` builds prompts, calls the model,
-  dispatches tool calls, parses final JSON, and attaches evidence.
-- Qloo boundary: `backend/app/agent/tools.py` compacts tool results for the
-  model while retaining evidence metadata; `backend/app/qloo/mcp_client.py`
-  manages the harness process and bounded tool retries;
+- Execution: `backend/app/api/decisions.py` runs explicit Qloo stages and
+  saves snapshots through `backend/app/api/decision_store.py`. Decision job
+  status remains in memory during execution.
+- Qloo boundary: `backend/app/qloo/mcp_client.py` manages the harness process
+  and bounded tool retries;
   `backend/app/qloo/normalizer.py` maps the six envelope statuses.
-- Model boundary: `backend/app/agent/provider.py` supports Gemini, OpenAI,
-  Groq, and OpenRouter through compatible chat-completion APIs.
+- Internal legacy harness: `backend/app/agent/loop.py` and
+  `backend/app/agent/provider.py` still serve `/api/agent/*` for development;
+  no frontend route uses that path.
 
-## What Qloo does in the shipped agent
+## What Qloo does in the product
 
-The legacy brief model currently sees only two Qloo tools:
-
-| Workflow | Current job | Evidence in the UI |
-| --- | --- | --- |
-| `find_tags` | Resolve the venue concept to Qloo tags. | Tag IDs and envelope metadata. |
-| `recommend` | Find artists and brands from concept tags plus region and audience. | Returned entity IDs and envelope metadata. |
-
-The system prompt asks for one concept tag lookup, one artist recommendation,
-one brand recommendation, then a JSON brief. It tells the model to cite Qloo
-IDs and leave unsupported sections empty. The UI displays an honest-absences
-list when evidence is missing. The current `menu_tilt` can use only food,
-cuisine, or amenity tags from concept resolution; it is not a validated menu
-optimization or sales recommendation.
-
-The decision workspace separately uses `describe` and `rank` through the MCP
-client in its deterministic pipeline. The harness and repository have live
-probes/contracts for `describe`, `rank`,
+The decision pipeline uses `find_tags` to resolve the concept,
+`recommend` for artist and optional brand discovery, `describe` for supplied
+artists, and `rank` over a shared artist shortlist per eligible venue.
+Concept and artist ambiguity can require a human choice. The harness and
+repository also have live probes/contracts for `describe`, `rank`,
 `where_popular`, `compare_audiences`, `audience_demographics`, `entity_tags`,
-and `trends` as well. These are **not** exposed to the served agent by default.
-The separate `qloo exec` adapter and its TTL cache support development and
-probes. The served MCP path now has its own per-client, five-minute cache for
+and `trends`. The separate `qloo exec` adapter and its TTL cache support
+development and probes. The MCP path has its own per-client, five-minute cache for
 identical `ok` and `empty` requests. Error and degraded responses are never
 cached; cache entries are cleared when that MCP session closes.
 
 ## Grounding and error behavior
 
-- The harness returns `ok`, `empty`, `needs_input`, `partial`, `degraded`, or
-  `error`. The client normalizes those shapes, and transient MCP errors get
-  bounded retries.
-- A `needs_input` response with candidates can be surfaced for a user pick.
-  A zero-candidate dead end bans that tool family for the remainder of the
-  run. Tag URNs are rejected in entity-only argument slots.
-- Tool results sent to the model are compacted; full raw envelopes are not
-  shown in the browser. Evidence metadata records operation, status, IDs,
-  result count, summary, correlation ID, and timestamp.
-- The LLM provider retries bounded 429/5xx failures and can shrink tool
-  history after a 413. An empty or malformed final JSON gets up to two
-  format-repair attempts without offering further Qloo tools. If parsing
-  still fails, the run aborts rather than presenting a fabricated brief.
-- Grounded MCP connection emits a status event immediately and has a
-  90-second readiness timeout. Agent execution has a separate 600-second
-  timeout. Disconnecting from SSE does not cancel the backend task.
+The harness returns `ok`, `empty`, `needs_input`, `partial`, `degraded`, or
+`error`. The product decision path stores typed source rows with Qloo IDs,
+query context, status, correlation ID, and retrieval time. Ambiguous concept
+or artist matches pause for a user choice. Missing evidence does not become
+a model guess. Decision jobs have a 180-second total budget and can be
+cancelled. The older model-driven brief path has separate retry and timeout
+behavior, but no longer has a product UI.
 
 ## Verified state and limitations
 
-The full backend suite passed **87 tests, 2 skipped**; frontend lint,
+Before the comparison removal, the full backend suite passed **87 tests, 2 skipped**; frontend lint,
 production build, and three mocked decision browser journeys passed. A live browser
 journey used the job API, resolved a public two-artist shortlist, ranked the
 same IDs for two eligible venues, and saved a changed-audience scenario over
-those IDs. The older brief
-path also completed a live grounded taco-shop/Austin/young-families run with
-four model steps and 19 trace events.
+those IDs. On 2026-10-28 a live browser walkthrough of the current decision
+path created three sourced artist-led options, changed the first two ranks
+under a new audience, saved a sample pilot and an explicitly synthetic
+outcome, and replayed saved evidence without another Qloo call.
 
-- The legacy demo outputs a narrative brief. The separate `/decision` path
-  asks for a programming objective and compares concrete pilot formats.
-- Nine presets are convenience inputs, not nine distinct decision workflows.
-- Only artist and brand recommendations are actively queried in the served
-  agent. Audience, geography, and trend claims should stay within those
-  results' actual meaning.
-- The current app does not independently verify every final prose claim
-  against raw Qloo rows after model generation; the prompt and displayed
-  evidence provide the main guardrails. Citation chips appear only for IDs
-  found in recorded evidence.
-- Brief run state and traces are in memory and disappear on restart. Decision
-  snapshots and operator-entered outcomes persist in local SQLite. There is
-  no authentication, project history, versioning, or export.
+- Artist and optional brand recommendations and artist rankings are actively
+  queried in the product decision path. Audience, geography, and trend
+  claims must stay within those results' actual meaning.
+- Decision snapshots and operator-entered outcomes persist in local SQLite;
+  in-flight jobs disappear on restart. There is no authentication, project
+  history, or versioning; JSON export and saved-evidence replay exist.
 - The app is local. `deploy/` contains a private-preview Compose package with
   Caddy password protection, but it has not been built on a Docker host or
   externally deployed. Root `README.md` and `LICENSE` are present.

@@ -1,6 +1,6 @@
 # Tastewell: product implementation plan
 
-Status: desk-research direction and implementation record, 2026-10-28. This plan supersedes the feature
+Status: product direction and implementation record, updated 2026-10-29 with the agentic decision slice. This plan supersedes the feature
 priorities in the deadline-driven `IMPLEMENTATION.md`; that file remains the
 record of what was built and learned. Start with
 [CURRENT_FUNCTIONALITY.md](CURRENT_FUNCTIONALITY.md) and
@@ -21,6 +21,184 @@ record of what was built and learned. Start with
 See [the current functionality inventory](CURRENT_FUNCTIONALITY.md) for
 exact API and UI behavior. The implementation is still a local product path;
 none of the operator or production gates above has been claimed as passed.
+
+## Scope decision: one product journey
+
+Retire the standalone `/compare` Qloo-versus-model demo. It asks a different
+question from the operator's job, duplicates an agent run, and did not give a
+reliable demonstration in the 2026-10-28 live browser check: the listening-bar
+case returned three successful Qloo envelopes but no grounded brief; the
+jazz-club case showed tags while leaving the actionable sections empty. The
+decision workspace completed a live concept resolution, returned three
+artist-led pilots with source IDs, changed artist order under a new audience,
+and saved a sample plan and explicitly synthetic outcome. These observations
+support making the decision workspace the only product surface; they do not
+establish operator value or real-world pilot impact.
+
+The frontend `/compare` route, its navigation entry, dual-pane components,
+and their UI tests are removed. Keep the old `/api/agent/*` backend path only
+as an internal development harness until its callers and tests are audited;
+it is not part of the product or submission story. Retire it separately if
+the decision path has no dependency. Do not replace the page with another
+model-only comparison. Demonstrate Qloo's contribution in the decision itself:
+the selected concept tag, exact source entities and queries, within-call
+artist ranks, changed-audience or changed-region rank movement, and an
+operator-selected pilot with stated unknowns.
+
+### Next implementation slice, in priority order
+
+1. **Restore and prove the live path.** Diagnose the Qloo MCP harness spawn
+   timeout, then complete a fresh decision through the visible UI. Confirm
+   concept or artist ambiguity handling, option sources, and a fixed-ID
+   scenario comparison. Health alone does not satisfy this gate.
+2. **Prove an external demo path.** Build and smoke-test the current app on
+   external hosting, protect shared decision history and operator data, and
+   verify a public repository with a visible license. Do not depend on a
+   private-access-only site for eligibility. Keep this deployment repeatable
+   so the agent slice can be released and tested on the same host.
+3. **Add one bounded decision agent.** Implement the agent review specified
+   below on a saved, ready decision. It must use the operator's objective,
+   inspect Qloo evidence, choose whether a supported scenario test is useful,
+   and recommend one option and venue or ask for input or abstain. Persist
+   its action record. Keep pilot selection with the operator.
+4. **Make the agent legible.** Add one review action and an inspectable result
+   to `/decision`: proposed pilot, why, alternatives considered, Qloo source
+   links, scenario movement, unknowns, and next check. Keep the invented
+   instant example explicitly separate from a live or saved-Qloo review.
+5. **Verify and publish the agent journey.** Run B1–B3 in `VALIDATION.md`, including
+   ambiguous IDs, sparse evidence, unsupported audience wording, unavailable
+   LLM/Qloo, and invalid model citations. Check keyboard/mobile use and
+   cancellation. Then test the agent journey on the external host from a
+   fresh browser and keep submitted claims within what that build shows.
+   An honest no-choice is a valid result.
+
+### 2026-10-29 implementation checkpoint
+
+- The workspace now opens a read-only illustrative decision instantly. Its
+  two venues, three artists, partner, Qloo-shaped source rows, IDs, ranks,
+  rank-changing audience scenario, and pilot plan are invented and labeled
+  as such. It makes no Qloo request, writes nothing to SQLite, hides the
+  live brief and selection/outcome controls, and provides a direct return
+  to the real brief.
+- The live ambiguity chooser now explains what the candidate tag describes
+  (place category, venue style, amenity, audience, activity, and other known
+  types). A place-category match is visually distinguished but still requires
+  the operator to choose it. Raw tag IDs remain inspectable in the evidence
+  drawer after selection. Artist records still lack enough metadata to
+  distinguish identical names reliably; their IDs remain visible in that
+  case, and richer candidate context is an open gate.
+- Frontend lint and production build passed. A live browser run for a
+  synthetic cocktail-bar brief reached the improved chooser, selected the
+  place-category tag, produced three options, and displayed the selected
+  tag ID in the source row. This proves the local flow, not recommendation
+  usefulness for a real venue.
+- Still open: fresh-session sample review by another person, the three
+  benchmark journeys, sparse-data and accessibility checks, hosted smoke
+  test, ownership/access control, and real operator feedback. The old
+  `/api/agent/*` backend remains an internal harness pending a careful audit.
+
+## Agentic decision slice: bounded pilot strategist
+
+**Decision:** extend the existing decision workspace with an agent review of
+a saved Qloo-backed shortlist. Do not put the legacy concept-brief agent on
+the page unchanged. Its prompt fixes two `recommend` calls and writes a
+different artifact; it does not inspect the decision's `rank` evidence or
+choose a pilot. Reuse its provider and trace plumbing where useful, but give
+the decision agent its own typed tools, output schema, and validator.
+
+The deterministic path remains responsible for Qloo concept and artist
+resolution, discovery, per-venue ranking, evidence capture, and hard checks.
+The agent receives the operator's objective, the eligible venues, option
+IDs, and a compact saved evidence summary. It may inspect source rows and
+choose one relevant Qloo-backed scenario test when the operator has supplied
+an alternate audience or region. It then proposes a first pilot and the
+smallest check that could change that choice. It may instead ask for an
+ambiguous or missing operator fact, or abstain when evidence is insufficient.
+It never books an artist, records a pilot selection, or fabricates an
+operational fact.
+
+### Review contract and allowed actions
+
+| Part | Implementation contract |
+| --- | --- |
+| Entry | `DecisionResult.status == "ready"`; a live decision or a clearly labeled replay of saved Qloo evidence. A replay permits saved-evidence inspection only and makes no fresh Qloo call. The invented `sampleDecision.ts` never calls the agent or appears as live evidence. |
+| Inputs | Saved decision ID and snapshot version, plus optional operator-confirmed alternate audience **or** region. Do not invent a demographic synonym or silently change the decision brief. |
+| Agent tools | `inspect_option(option_id)` returns only saved option and evidence rows; `check_venue(venue_id)` returns operator-supplied eligibility and budget facts; `compare_scenario(venue_id, audience, region)` delegates to the existing fixed-shortlist Qloo rank path, at most once on a live decision, only when the context actually changes. No arbitrary tool name, free-form Qloo arguments, web search, or direct write tool. The existing scenario path persists any new comparison. |
+| Limits | At most four model turns and one new Qloo rank call, inside a total review timeout. Cancel on request. If the LLM is unavailable, retain the deterministic options and show review unavailable; do not silently substitute generic prose. |
+| Output | A typed `recommend`, `needs_input`, or `abstain` result. A recommendation contains `option_id`, `venue_id`, cited `evidence_ids`, any `scenario_id`, a short rationale, alternatives considered, material unknowns, and one next validation action. Save the action log and the exact evidence snapshot version used. |
+| Human control | The agent proposes. The existing selection endpoint still requires the operator's venue, owner, timing, measure, cost assumptions, and explicit submit action. A later scenario or evidence change marks an older review as stale. |
+
+Use structured claim fields and render factual Qloo statements from validated
+IDs, ranks, and query contexts rather than trusting free-form model prose.
+The server validates every model output before it is saved or displayed.
+Option, venue, scenario, and evidence IDs must exist in the reviewed snapshot;
+cited evidence must have an appropriate successful status and actually support
+the named option or scenario. A selected venue must permit live music. A
+known quoted cost above the operator's budget is disallowed; unknown costs
+remain unverified. Artist ranks are ordinal only within their own Qloo call.
+The output schema has no fields for cross-call affinity arithmetic, combined
+artist/brand scores, fees or availability, individual preference, predicted
+attendance or sales, or unsupported geographic claims. On one invalid
+model response, retry with validation errors and the same evidence; then
+abstain with an explicit reason. Treat Qloo names and operator text as data,
+not instructions to the tool dispatcher.
+
+### Build sequence and file boundaries
+
+1. **Grounding and storage.** Add typed `AgentReview`, `AgentAction`, and
+   snapshot fingerprint fields alongside `DecisionResult` in
+   `backend/app/api/decisions.py`. Save them through
+   `backend/app/api/decision_store.py`; include them in export and preserve
+   clear live/replay labels. Fingerprint the canonical request, options,
+   evidence, and scenarios before and after a review. If the agent adds a
+   scenario, store that final fingerprint with its result; compare it with
+   the current decision to mark the review stale after later changes.
+2. **Agent execution.** Add a decision-specific runner under
+   `backend/app/agent/`. Reuse `LlmProvider`, but pass only bounded tool
+   schemas and compact evidence. Its dispatcher calls existing engine
+   functions for a scenario, records actions and correlation/evidence IDs,
+   and returns typed results. Ensure repeated requests use the same
+   snapshot version or explicitly start a new review.
+3. **HTTP jobs.** Add `POST /api/decisions/{id}/agent-reviews` and
+   `GET`/`DELETE /api/decisions/{id}/agent-reviews/{review_id}` in
+   `backend/app/api/routes.py`, with progress, cancellation, a bounded
+   timeout, and useful failures. Persist completed reviews; in-flight jobs
+   may remain in memory as current decision jobs do. Do not let cancellation
+   leave a partial recommendation marked ready.
+4. **Decision UI.** Add a single "Review the pilot choice" action after
+   options in `frontend/app/decision/page.tsx`. Show the agent's action
+   summary in operator language, the Qloo comparison it ran, linked source
+   rows, uncertainty, and an explicit "Choose this pilot" path to the
+   existing plan form. Label replay or saved evidence; show no agent result
+   on the invented example. Keep raw tool arguments in a disclosure, not as
+   the primary explanation.
+5. **Verification.** Unit-test dispatch limits, status handling, snapshot
+   staleness, ID/claim validation, no-selection side effects, and LLM/Qloo
+   failures. Run a browser journey from a fresh live decision through review
+   and human selection; verify export/reopen shows the same action record.
+   Use one consent-safe, redacted Qloo snapshot for a read-only replay demo
+   only after checking the data and license terms. Update
+   `CURRENT_FUNCTIONALITY.md`, `VALIDATION.md`, and the root overview with
+   observed behavior, then run `graphify update .` after code changes.
+
+**Acceptance gate:** a reviewer can identify what the agent chose to inspect,
+which Qloo call it requested or why none was needed, what Qloo changed, why it
+proposed a specific option and venue, and which facts remain unverified. B1
+must produce a cited recommendation or a precise missing-fact request; B2
+must not resolve ambiguity or rewrite an audience silently; B3 must show why
+review cannot start without evidence, or label cultural fit unverified if
+usable evidence exists. Invalid IDs and unsupported claims never
+appear as grounded recommendations. The hosted journey must pass this gate
+before the submission calls the visible product an agent-powered app.
+
+**Release cutline:** a functioning external Qloo decision and safe public
+demo take precedence over the new agent slice. If the agent review cannot
+pass its grounding and hosted smoke tests before submission, keep it out of
+the public journey and describe the shipped deterministic workflow accurately.
+The invented instant example does not substitute for a live Qloo run or an
+agent demonstration. Public access also needs isolated or protected decision
+records: the present unauthenticated list/get/export endpoints must not
+expose another visitor's data.
 
 ## Product thesis
 
@@ -115,9 +293,9 @@ here is the cheapest credible test and what would change our mind.”**
    with success measures chosen by the operator. Save the decision and its
    evidence snapshot so a later run can be compared with it.
 
-The default product view is grounded. The existing generic run becomes an
-optional “How would an ungrounded model answer?” explanation in a demo or
-methodology panel; it should not double latency for every operator action.
+The product view is the grounded decision workspace. An internal offline
+model-only benchmark can help evaluation, but it does not appear in the
+operator UI or double latency for an operator action.
 
 ## Map decision: useful, but only for a geographic question
 
@@ -174,8 +352,9 @@ generator provides:
 
 1. An operator can enter their own venues, shortlist, and constraints. The
    current demonstration uses explicitly synthetic inputs.
-2. Qloo changes a concrete choice. The UI shows which alternative would
-   have been chosen without a particular signal, and what remains uncertain.
+2. Qloo changes a concrete choice. The UI shows how a fixed artist shortlist
+   changes rank under a different audience or region, the source calls behind
+   each result, and what remains uncertain.
 3. The operator rejects or edits an option and the system re-plans without
    losing source history or confirmed constraints.
 4. The selected option becomes an executable pilot with owner, date,
@@ -240,8 +419,8 @@ unacceptable outcomes, cited market context, and recorded technical results.
 This gate cannot establish buyer demand or willingness to pay.
 
 Resume context: use `docs/CURRENT_FUNCTIONALITY.md`, `docs/qloo-contract.md`,
-and the nine current presets. Use clearly labeled proxy assumptions wherever
-operator facts are unavailable.
+and the three benchmark briefs in `docs/VALIDATION.md`. Use clearly labeled
+proxy assumptions wherever operator facts are unavailable.
 
 ### Phase 1 — Evidence ledger and deterministic data pipeline
 
@@ -265,10 +444,10 @@ Work:
 Gate: every displayed recommendation can open its source row; invalid IDs
 never render as grounded; repeated identical requests reuse cached evidence.
 
-Resume context: start at `backend/app/agent/tools.py`,
-`backend/app/qloo/mcp_client.py`, `backend/app/api/engine.py`, and
-`backend/app/agent/loop.py`. The existing `qloo exec` TTL cache is not on the
-served MCP path. Preserve six-status semantics and existing tests.
+Resume context: start at `backend/app/api/decisions.py`,
+`backend/app/api/decision_store.py`, and `backend/app/qloo/mcp_client.py`.
+The served MCP client has a per-session cache for identical successful or
+empty requests. Preserve six-status semantics and existing decision tests.
 
 ### Phase 2 — Decision engine for programming alternatives
 
@@ -299,9 +478,9 @@ For this desk-research run, test a clearly labeled synthetic shortlist. A
 real-world feasibility or value claim would still require real operator data.
 
 Resume context: `docs/qloo-contract.md` verifies `rank` only within one
-call, and `GroundedTools.DEFAULT_LLM_TOOLS` currently exposes just
-`find_tags`/`recommend`. Expand a stage's allowed tools deliberately rather
-than exposing all nine to one unbounded agent loop.
+call. The decision path already uses `find_tags`, `recommend`, `describe`,
+and `rank` in explicit stages. Add new workflows only after their contracts
+and decision value are verified.
 
 ### Phase 3 — Decision workspace UI
 
@@ -309,25 +488,24 @@ than exposing all nine to one unbounded agent loop.
 trace or comparing two chat responses.
 
 Work:
-- Replace the dual-pane first screen with a decision setup, progress,
-  three option cards, evidence drawer, and selected-plan workspace.
+- Keep the decision setup, progress, three option cards, evidence drawer,
+  scenario comparison, and selected-plan workspace as the only product flow.
 - Add clear states for missing evidence, ambiguity, retries, and cancelled
   runs. Show progress by pipeline stage and time elapsed.
 - Allow a user to pin, exclude, or revise candidate entities and regenerate
   only dependent stages. Show exactly what changed between versions.
-- Keep the generic comparison as an opt-in explainer. Make the grounded
-  evidence and decision difference legible without it.
+- Remove the legacy dual-pane route and its UI dependencies. Make Qloo's
+  contribution legible through the option evidence and scenario movement.
 - Test keyboard navigation, mobile layout, readable source context, and
   a complete no-login demo journey.
 
 Gate: a new user can select a feasible option and explain its evidence in
 under five minutes; a sparse-data case exits honestly and usefully.
 
-Resume context: `frontend/app/TastewellApp.tsx` currently starts both modes
-with `Promise.allSettled`; `BriefForm.tsx` only gathers concept/region/
-audience; `ResultPane.tsx` renders prose sections. Replace that orchestration
-incrementally against the typed Phase 1/2 API, retaining the current path
-as a regression fixture until the new flow is stable.
+Resume context: `/` and `/decision` render `frontend/app/decision/page.tsx`.
+The retired brief page is no longer a frontend regression target. Exercise
+`frontend/e2e/decision.spec.ts` and the opt-in live decision test against
+the explicit decision API.
 
 ### Phase 4 — Scenario lab and geographic intelligence
 
@@ -384,9 +562,10 @@ Work:
 Gate: a user can return later, understand why they chose an option, record
 what happened, and make a better next decision without losing provenance.
 
-Resume context: today `Engine.runs` is an in-memory dictionary; SSE history
-and picks disappear on restart. Pick a persistent storage design only after
-the Phase 1 evidence schema is stable.
+Resume context: completed decisions, evidence, plans, scenarios, outcomes,
+and replays now persist in SQLite. Decision jobs remain in memory, and there
+is no user ownership, project versioning, or retention policy. Extend that
+storage model before opening access to multiple operators.
 
 ### Phase 6 — Reliability, evaluation, and production
 
@@ -417,11 +596,12 @@ the evidence rubric improves on the current brief baseline; at least two
 pilot operators complete a real decision and one records an outcome; saved
 decisions survive a restart; a fresh install and hosted smoke test pass.
 
-Resume context: the current mocked backend suite passed 69 tests with one
-live test skipped on 2026-10-27. There is no `deploy/` directory. See
-`backend/serve.ps1`, `frontend/.env.local`, and the deployment notes in
-`IMPLEMENTATION.md` for the present local setup, but reassess capacity and
-storage for the larger product.
+Resume context: before the comparison removal, the backend suite passed
+87 tests with 2 skipped. The frontend lint and production build passed after
+the removal on 2026-10-28. `deploy/` contains an unbuilt private-preview
+Compose/Caddy package; no hosted smoke test has run. See `backend/serve.ps1`,
+`DEPLOYMENT.md`, and `deploy/README.md` for the local and planned setup, and
+reassess access control, capacity, and storage before public exposure.
 
 ## Sequencing and decision points
 
@@ -439,29 +619,22 @@ until those answers are supported by real user evidence.
 
 ## Next-chat launch checklist
 
-1. Read `HANDOFF.md`, `docs/CURRENT_FUNCTIONALITY.md`, this plan, and the
-   relevant sections of `docs/qloo-contract.md`. Treat the old P5/P6 dates in
-   `IMPLEMENTATION.md` as historical.
-2. Read `AGENTS.md`. Query the existing Graphify code graph before raw code
-   search/read; use `graphify explain "GroundedTools"` or a focused query to
-   locate implementation seams. The code-only graph is sufficient for this
-   plan. Do not upload repo documents/images to an LLM indexing backend
-   without specific authorization.
-3. Preserve the current working tree. Run `git status --short`; do not reset
-   the uncommitted fixes/docs. Verify listeners before assuming local servers
-   are alive.
-4. Create `docs/VALIDATION.md` for Phase 0: buyer and purchase hypotheses,
-   a short interview guide, three concrete decisions from a plausible
-   multi-venue operator, expected outputs, failure cases, and the scoring
-   rubric. Mark assumptions and evidence separately.
-5. Build a probe table for the first decision: inputs, Qloo workflow, exact
-   contract, ambiguity handling, output field, and claim it can support.
-   Probe only unanswered contract questions with bounded live calls; record
-   results in `docs/qloo-contract.md`.
-6. Use the resulting brief and rubric to define the Phase 1 typed evidence
-   schema and a narrow Phase 2 programming-decision slice. Keep the map and
-   persistent workspace behind their own gates.
-
-Phase 0 is ready to hand off when another developer can run the three cases,
-judge the outputs against written criteria, and list the questions that
-require a real operator rather than guessing them in code.
+1. Read `AGENTS.md`, `HANDOFF.md`, `docs/CURRENT_FUNCTIONALITY.md`, this plan,
+   and the relevant sections of `docs/qloo-contract.md`. Treat old milestone
+   dates in `IMPLEMENTATION.md` as historical. Query Graphify before raw code
+   search or reads. Preserve the working tree and verify listeners.
+2. Start from `/` and the decision API. The `/compare` frontend and its
+   mocked UI tests were retired; do not restore them as the default demo.
+   Audit `/api/agent/*` callers before deleting the internal backend harness.
+3. Implement the ordered next slice above: restore Qloo readiness, add the
+   bounded agent review to the decision workspace, run benchmark and
+   accessibility checks, and smoke-test a judge-accessible deployment.
+   Keep Qloo evidence visible without asking users to interpret URNs or an
+   internal tool trace.
+4. Reconcile `docs/VALIDATION.md` with any new observations. A synthetic
+   walkthrough confirms software behavior, not demand, revenue, or a real
+   pilot outcome. Record real operator evidence only when it exists.
+5. After code edits, run focused decision browser checks, frontend lint/build,
+   relevant backend tests, and `graphify update .`. If the installed Graphify
+   launcher remains unavailable, record that failure and retry when its uv
+   runtime is restored.

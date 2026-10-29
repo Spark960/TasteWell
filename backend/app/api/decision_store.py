@@ -24,18 +24,27 @@ class DecisionStore:
             id TEXT PRIMARY KEY,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
-            document TEXT NOT NULL
+            document TEXT NOT NULL,
+            owner_id TEXT
         )""")
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(decisions)")}
+        if "owner_id" not in columns:
+            conn.execute("ALTER TABLE decisions ADD COLUMN owner_id TEXT")
         return conn
 
-    def save(self, result: DecisionResult) -> None:
+    def save(self, result: DecisionResult, owner_id: str | None = None) -> None:
         with closing(self._connect()) as conn:
             with conn:
-                conn.execute("""INSERT INTO decisions (id, created_at, updated_at, document)
-                    VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET
+                conn.execute("""INSERT INTO decisions (id, created_at, updated_at, document, owner_id)
+                    VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET
                     updated_at=excluded.updated_at, document=excluded.document""",
                     (result.id, result.created_at, result.updated_at,
-                     result.model_dump_json()))
+                     result.model_dump_json(), owner_id))
+
+    def get_owner(self, decision_id: str) -> str | None:
+        with closing(self._connect()) as conn:
+            row = conn.execute("SELECT owner_id FROM decisions WHERE id=?", (decision_id,)).fetchone()
+        return row[0] if row else None
 
     def get(self, decision_id: str) -> DecisionResult | None:
         with closing(self._connect()) as conn:
@@ -43,12 +52,18 @@ class DecisionStore:
                                (decision_id,)).fetchone()
         return DecisionResult.model_validate_json(row[0]) if row else None
 
-    def list_recent(self, limit: int = 30) -> list[dict]:
+    def list_recent(self, limit: int = 30, owner_id: str | None = None) -> list[dict]:
         with closing(self._connect()) as conn:
-            rows = conn.execute(
-                "SELECT document FROM decisions ORDER BY updated_at DESC LIMIT ?",
-                (min(max(limit, 1), 100),),
-            ).fetchall()
+            if owner_id is None:
+                rows = conn.execute(
+                    "SELECT document FROM decisions ORDER BY updated_at DESC LIMIT ?",
+                    (min(max(limit, 1), 100),),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT document FROM decisions WHERE owner_id=? ORDER BY updated_at DESC LIMIT ?",
+                    (owner_id, min(max(limit, 1), 100)),
+                ).fetchall()
         return [
             {
                 "id": item.id,

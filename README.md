@@ -1,31 +1,33 @@
 # Tastewell
 
 Tastewell helps a venue operator choose a programming pilot across one or
-more venues. The primary workspace at `/` (also available at `/decision`) resolves a concept
+more venues. The workspace at `/` (also available at `/decision`) resolves a concept
 and artist shortlist with Qloo, compares the same artist IDs per venue,
 shows inspectable evidence, and saves the selected pilot and outcome. The
-secondary `/compare` demo still generates a Qloo-grounded concept brief beside a
-generic LLM-only brief.
+source queries and changed-audience or changed-region ranks show how Qloo
+informs a specific decision.
 
 ## Why Qloo
 
 A generic model can suggest a playlist or a menu theme, but it cannot establish
 which cultural signals are connected in Qloo's graph for the requested audience
-and area. Tastewell's grounded agent uses the Qloo harness over MCP:
+and area. Tastewell's decision pipeline uses the Qloo harness over MCP:
 
-1. `qloo_find_tags` resolves the venue concept into candidate Qloo tag IDs.
-2. `qloo_recommend` asks for artists and brands using those tags, the audience,
-   and the region.
-3. The agent writes a brief with source IDs. The UI exposes each tool's status,
-   result count, and provenance in a live trace and evidence chips.
+1. `find_tags` resolves the venue concept into candidate Qloo tag IDs, with a
+   human choice when the match is ambiguous.
+2. `recommend` discovers artists and an optional brand using the chosen tag,
+   audience, and region; supplied artist names can instead be resolved with
+   `describe`.
+3. `rank` orders the same artist IDs within each eligible venue. The UI
+   preserves source queries and IDs, and a scenario can rerank those IDs for
+   a changed audience or region.
 
-For example, a request for a taco shop in Austin targeting young families
-first resolves “taco shop” to Qloo tags. Those tag IDs, `Austin, Texas`, and
-`young families` become inputs to artist and brand recommendation calls. A
-recommendation can appear in the brief only when it is supported by a returned
-Qloo ID. Ambiguous matches are shown for a user choice; missing results are
-reported as absences. See [the Qloo contract](docs/qloo-contract.md) for
-observed request and response shapes.
+A proposed artist has a Qloo ID and an inspectable source row. A changed
+audience can change the ordering of the same artist shortlist; ranks from
+different calls are labeled separately. Ambiguous matches require a user
+choice, and missing evidence is reported rather than filled with guesses.
+See [the Qloo contract](docs/qloo-contract.md) for observed request and
+response shapes.
 
 Qloo data describes aggregate affinities. It does not establish what any
 individual likes, what they will buy, or that a venue concept will succeed.
@@ -41,13 +43,16 @@ individual likes, what they will buy, or that a venue concept will succeed.
 - Cancellable decision jobs with stage and elapsed-time display, saved
   evidence, pilot selection, aggregated outcomes, JSON export, and labeled
   replay from a saved snapshot.
-- Nine quick-start venue presets and free-form concept, region, and audience
-  fields in the older brief demo.
-- A grounded brief with audience profile, menu tilt, music programming,
-  adjacent brands, tag themes, and explicit absences.
-- A generic comparison showing what the same model suggests without
-  Qloo data.
-- Live tool-call trace, source IDs, and a picker for ambiguous Qloo matches.
+- A bounded agent review of a ready saved decision. The agent can inspect
+  option evidence and venue constraints, request at most one operator-confirmed
+  fixed-ID Qloo scenario on a live decision, and propose a pilot or abstain.
+  Its action record, citations, and evidence fingerprint persist in the
+  decision export. The operator still submits the pilot plan.
+- Inspectable Qloo source IDs and a picker for ambiguous concept or artist
+  matches.
+- An instant read-only illustrative decision with invented `urn:sample` IDs,
+  a rank-changing audience scenario, and a sample plan. It does not call
+  Qloo or save an outcome; use the live brief for actual Qloo evidence.
 - Bounded retries for transient provider/tool failures and malformed final
   model output. Failed runs surface an error rather than invented evidence.
 
@@ -95,20 +100,20 @@ hackathon host configured in `.env.example`.
    npm run dev
    ```
 
-Open <http://localhost:3000> for the decision workspace or
-<http://localhost:3000/compare> for the brief demo. The backend health check is
+Open <http://localhost:3000> for the decision workspace. The backend health check is
 <http://localhost:8000/api/health>.
 
 ## API and development
 
 The frontend is Next.js; the backend is FastAPI. The browser never receives a
-Qloo or LLM key. `POST /api/agent/run` starts a grounded or generic run,
-`GET /api/agent/stream/{run_id}` streams trace events, and
-`GET /api/agent/runs/{run_id}` returns the current result.
+Qloo or LLM key. The older `/api/agent/*` endpoints remain only as an internal
+development harness; the product UI does not call them.
 `POST /api/decision-jobs` starts a cancellable decision; polling
 `GET /api/decision-jobs/{job_id}` shows progress and `DELETE` cancels it.
 Saved decision routes support resolution, scenario comparison, pilot
-selection, outcomes, replay, and export.
+selection, outcomes, replay, and export. `POST
+/api/decisions/{id}/agent-reviews` starts a cancellable review; `GET` and
+`DELETE /api/decisions/{id}/agent-reviews/{review_id}` inspect or cancel it.
 
 Run backend tests with `python -m pytest -q` from `backend/`; run frontend
 lint with `npm run lint` from `frontend/`. The backend suite uses mocked
@@ -126,9 +131,8 @@ is prepared but has not been built on a Docker host or deployed. It uses one
 shared password rather than multi-user ownership. Do not expose the local
 decision API or its saved history publicly without an access-control layer.
 Concept resolution and recommendation coverage vary by audience and region.
-Qloo affinity is a cultural signal, not a demand or sales forecast. The
-brief demo can end with an error when bounded model repair fails. Brief runs
-and in-flight decision jobs reset when the backend restarts; completed
+Qloo affinity is a cultural signal, not a demand or sales forecast. In-flight
+decision jobs reset when the backend restarts; completed
 decisions persist in SQLite. Buyer interviews and real operator pilots are
 still required before claiming product value or commercial viability.
 

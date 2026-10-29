@@ -1,6 +1,6 @@
 # Deploy Tastewell on AWS: beginner guide
 
-Updated 2026-10-28. This guide is for the current **private pilot**. It puts the Next.js site, FastAPI API, Qloo harness, SQLite database, and Caddy web server on one Ubuntu machine. Follow the steps in order. Commands marked **Windows PowerShell** run on your computer; commands marked **Ubuntu terminal** run on the AWS server.
+Updated 2026-10-29. This guide is for the current **private pilot**. It puts the Next.js site, FastAPI API, Qloo harness, SQLite database, and Caddy web server on one Ubuntu machine. Follow the steps in order. Commands marked **Windows PowerShell** run on your computer; commands marked **Ubuntu terminal** run on the AWS server.
 
 The deployment has **not yet happened**. The local Docker daemon is unavailable and the local Qloo readiness check currently times out. You will know the AWS deployment is ready only after the checks in Step 8 pass on the new server.
 
@@ -13,7 +13,7 @@ The deployment has **not yet happened**. The local Docker daemon is unavailable 
 - **Caddy:** handles HTTPS and asks for one username/password before showing any page or API result.
 - **SQLite volume:** stores saved decisions on that instance. You must back it up.
 
-This is a **single-password pilot**. Everyone with the password can see every saved decision. Do not enter personal customer data or invite unrelated users. The Qloo key in this repository is configured for the hackathon host; verify its continued validity and usage terms before relying on the service beyond the pilot.
+This is a **single-password pilot**. Each browser has a signed session, and saved decisions are visible only to the browser that created them. The password is still shared; it is a demo gate, not an individual account. Clearing cookies loses access to that browser's decisions. Do not enter personal customer data. The Qloo key in this repository is configured for the hackathon host; verify its continued validity and usage terms before relying on the service beyond the pilot.
 
 ## Why Lightsail, and what it may cost
 
@@ -157,7 +157,7 @@ nano .env
 chmod 600 .env
 ~~~
 
-In nano, set **QLOO_API_KEY**, **LLM_PROVIDER**, and the matching provider key (for example GEMINI_API_KEY if LLM_PROVIDER=gemini). Keep QLOO_BASE_URL and QLOO_TRUSTED_BASE_URL pointing at the hackathon host only while your hackathon key is valid. Save with **Ctrl+O, Enter, Ctrl+X**. Other blank provider keys can remain blank. Never put real keys in .env.example.
+In nano, set **QLOO_API_KEY**, **LLM_PROVIDER**, the matching provider key (for example GEMINI_API_KEY if LLM_PROVIDER=gemini), and **SESSION_SECRET**. Generate a random session secret with `openssl rand -hex 32` on Ubuntu and paste the output only into `.env`; keep it stable across redeploys or existing browser sessions will lose access. Keep QLOO_BASE_URL and QLOO_TRUSTED_BASE_URL pointing at the hackathon host only while your hackathon key is valid. Save with **Ctrl+O, Enter, Ctrl+X**. Other blank provider keys can remain blank. Never put real keys in .env.example.
 
 Choose a long unique password for the pilot. Generate a **hash** in Ubuntu:
 
@@ -258,4 +258,4 @@ Keep that terminal open and visit **http://localhost:8080/decision** on that Win
 | Build fails or host becomes unresponsive | Inspect free disk and RAM with df -h and free -h; the 2 GB plan is especially likely to struggle. |
 | Unexpected AWS spending | Inspect Billing by service/region, Lightsail instances, snapshots, detached static IPs, domain charges, and transfer. A stopped instance is still billed. |
 
-The stack is suitable for a **small private pilot** after its build and smoke tests pass. It does not provide separate user accounts, automated off-site backups, a retention policy, or measured production capacity. Those require further engineering before a public service.
+The stack is suitable for a **small private pilot** after its build and smoke tests pass. It does not provide recoverable user accounts, automated off-site backups, a retention policy, or measured production capacity. Those require further engineering before a public service.

@@ -24,8 +24,10 @@ from pydantic import BaseModel
 from app.agent.loop import AgentOutcome, AgentRunner, BriefRequest
 from app.agent.provider import LlmProvider, ProviderConfigError
 from app.agent.tools import GroundedTools
+from app.agent.decision_review import ReviewRequest, run_decision_review
 from app.api.decisions import (DecisionRequest, DecisionResult, ScenarioRequest,
-                               ScenarioResult, build_decision, compare_scenario, stamp)
+                               ScenarioResult, AgentReview, build_decision, compare_scenario,
+                               evidence_fingerprint, stamp)
 from app.api.decision_store import DecisionStore
 from app.qloo.mcp_client import QlooMcpClient
 from app.qloo.redact import redact, register_secret
@@ -84,8 +86,9 @@ class RunState:
 
 
 class DecisionJob:
-    def __init__(self) -> None:
+    def __init__(self, owner_id: str | None = None) -> None:
         self.id = f"job_{uuid.uuid4().hex[:12]}"
+        self.owner_id = owner_id
         self.status = "queued"
         self.stage = "queued"
         self.started = time.monotonic()
@@ -100,6 +103,24 @@ class DecisionJob:
             "decision": self.result.model_dump() if self.result else None,
             "error": self.error or None,
         }
+
+
+class AgentReviewJob:
+    def __init__(self, decision_id: str) -> None:
+        self.id = f"review_{uuid.uuid4().hex[:12]}"
+        self.decision_id = decision_id
+        self.status = "queued"
+        self.stage = "queued"
+        self.started = time.monotonic()
+        self.review: AgentReview | None = None
+        self.error = ""
+        self.task: asyncio.Task | None = None
+
+    def summary(self) -> dict:
+        return {"review_id": self.id, "status": self.status, "stage": self.stage,
+                "elapsed_seconds": round(time.monotonic() - self.started, 1),
+                "review": self.review.model_dump() if self.review else None,
+                "error": self.error or None}
 
 
 ProviderFactory = Callable[[Settings, RunRequest], Any]
@@ -151,13 +172,15 @@ class Engine:
         self.runs: dict[str, RunState] = {}
         self.decisions: dict[str, DecisionResult] = {}
         self.decision_jobs: dict[str, DecisionJob] = {}
+        self.agent_review_jobs: dict[str, AgentReviewJob] = {}
         self.decision_store = decision_store or DecisionStore()
 
     async def new_decision(self, req: DecisionRequest,
-                           progress: Callable[[str], None] | None = None) -> DecisionResult:
+                           progress: Callable[[str], None] | None = None,
+                           owner_id: str | None = None) -> DecisionResult:
         result = await self._build_decision(req, progress)
         self.decisions[result.id] = result
-        self.decision_store.save(result)
+        self.decision_store.save(result, owner_id=owner_id)
         return result
 
     async def _build_decision(self, req: DecisionRequest,
@@ -230,14 +253,16 @@ class Engine:
         self.save_decision(result)
         return result
 
-    def start_decision_job(self, req: DecisionRequest) -> DecisionJob:
-        job = DecisionJob()
+    def start_decision_job(self, req: DecisionRequest,
+                           owner_id: str | None = None) -> DecisionJob:
+        job = DecisionJob(owner_id)
         self.decision_jobs[job.id] = job
         job.task = asyncio.create_task(self._execute_decision_job(job, req=req))
         self._prune_decision_jobs()
         return job
 
-    def start_resolution_job(self, decision_id: str, candidate_id: str) -> DecisionJob:
+    def start_resolution_job(self, decision_id: str, candidate_id: str,
+                             owner_id: str | None = None) -> DecisionJob:
         previous = self.get_decision(decision_id)
         if previous is None:
             raise KeyError(decision_id)
@@ -245,7 +270,7 @@ class Engine:
             candidate.get("id") == candidate_id for candidate in previous.candidates
         ):
             raise ValueError("candidate is not available for this decision")
-        job = DecisionJob()
+        job = DecisionJob(owner_id)
         self.decision_jobs[job.id] = job
         job.task = asyncio.create_task(self._execute_decision_job(
             job, decision_id=decision_id, candidate_id=candidate_id))
@@ -259,7 +284,8 @@ class Engine:
             job.status = "running"
             job.stage = "starting"
             if req is not None:
-                job.result = await self.new_decision(req, progress=lambda value: setattr(job, "stage", value))
+                job.result = await self.new_decision(
+                    req, progress=lambda value: setattr(job, "stage", value), owner_id=job.owner_id)
             else:
                 job.result = await self.resolve_decision(
                     decision_id, candidate_id, progress=lambda value: setattr(job, "stage", value))
@@ -297,12 +323,12 @@ class Engine:
     def get_decision(self, decision_id: str) -> DecisionResult | None:
         return self.decisions.get(decision_id) or self.decision_store.get(decision_id)
 
-    def save_decision(self, result: DecisionResult) -> None:
+    def save_decision(self, result: DecisionResult, owner_id: str | None = None) -> None:
         result.updated_at = now_iso()
         self.decisions[result.id] = result
-        self.decision_store.save(result)
+        self.decision_store.save(result, owner_id=owner_id)
 
-    def replay_decision(self, decision_id: str) -> DecisionResult:
+    def replay_decision(self, decision_id: str, owner_id: str | None = None) -> DecisionResult:
         original = self.get_decision(decision_id)
         if original is None:
             raise KeyError(decision_id)
@@ -316,8 +342,72 @@ class Engine:
         replay.selected_at = None
         replay.pilot_plan = None
         replay.outcome = None
-        self.save_decision(replay)
+        replay.agent_reviews = []
+        self.save_decision(replay, owner_id=owner_id)
         return replay
+
+    def start_agent_review(self, decision_id: str, request: ReviewRequest) -> AgentReviewJob:
+        decision = self.get_decision(decision_id)
+        if decision is None:
+            raise KeyError(decision_id)
+        if decision.status != "ready" or not decision.options:
+            raise ValueError("a ready Qloo-backed decision is required")
+        if evidence_fingerprint(decision) != request.snapshot_fingerprint:
+            raise ValueError("decision evidence changed; refresh before reviewing")
+        job = AgentReviewJob(decision_id)
+        self.agent_review_jobs[job.id] = job
+        job.task = asyncio.create_task(self._execute_agent_review(job, request))
+        if len(self.agent_review_jobs) > 100:
+            for old_id, old_job in list(self.agent_review_jobs.items()):
+                if old_id != job.id and old_job.task is not None and old_job.task.done():
+                    del self.agent_review_jobs[old_id]
+                if len(self.agent_review_jobs) <= 100:
+                    break
+        return job
+
+    async def _execute_agent_review(self, job: AgentReviewJob, request: ReviewRequest) -> None:
+        try:
+            job.status, job.stage = "running", "inspecting Qloo evidence"
+            original = self.get_decision(job.decision_id)
+            if original is None:
+                raise ValueError("decision is unavailable")
+            working = original.model_copy(deep=True)
+            provider = self._provider_factory(self.settings, RunRequest(brief=working.request.objective))
+            def client_factory() -> Any:
+                return self._client_factory(self.settings, RunRequest(brief=working.request.concept))
+            async with asyncio.timeout(90):
+                review = await run_decision_review(working, request, provider, client_factory)
+            current = self.get_decision(job.decision_id)
+            if current is None or evidence_fingerprint(current) != request.snapshot_fingerprint:
+                raise ValueError("decision changed during review; refresh and retry")
+            review.id = job.id
+            current.evidence = working.evidence
+            current.scenarios = working.scenarios
+            current.agent_reviews.append(review)
+            self.save_decision(current)
+            job.review = review
+            job.status, job.stage = "done", "complete"
+        except asyncio.CancelledError:
+            job.status, job.stage = "cancelled", "cancelled"
+        except TimeoutError:
+            job.status, job.stage, job.error = "error", "timed out", "review exceeded its 90-second budget"
+        except Exception as exc:
+            job.status, job.stage = "error", "unavailable"
+            job.error = redact(f"Review unavailable: {type(exc).__name__}: {exc}")
+            log.exception("agent review=%s failed", job.id)
+
+    def get_agent_review_job(self, decision_id: str, review_id: str) -> AgentReviewJob | None:
+        job = self.agent_review_jobs.get(review_id)
+        return job if job and job.decision_id == decision_id else None
+
+    def cancel_agent_review(self, decision_id: str, review_id: str) -> AgentReviewJob:
+        job = self.get_agent_review_job(decision_id, review_id)
+        if job is None:
+            raise KeyError(review_id)
+        if job.task is not None and not job.task.done():
+            job.stage = "cancelling"
+            job.task.cancel()
+        return job
 
     async def new_run(self, req: RunRequest) -> RunState:
         from app.api.stream import SseBus, StreamingTrace
@@ -431,7 +521,7 @@ class Engine:
         try:
             client = self._client_factory(settings, RunRequest(brief="status"))
             try:
-                await asyncio.wait_for(client.__aenter__(), timeout=15.0)
+                await asyncio.wait_for(client.__aenter__(), timeout=45.0)
             except asyncio.TimeoutError:
                 return {"ready": False, "reason": "harness spawn timeout"}
             if not client.tools:

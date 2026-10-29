@@ -1,4 +1,157 @@
-# Tastewell handoff for the next chat (2026-10-27)
+# Tastewell handoff for the next chat (2026-10-29)
+
+## Hackathon requirement and submission status audit (2026-10-29)
+
+The root [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) is now the current status.
+The code has a genuine Qloo-backed decision pipeline and an older LLM
+tool-calling agent wired to Qloo, but the visible product path is deterministic
+and does not use that agent. The "agentic tool" reading is plausible, not a
+guaranteed judge interpretation; make agent action visible in the decision
+journey before claiming a strong agentic submission. The app only needs one
+focused cultural use case, not every Qloo domain.
+
+The current backend health check passed, but `/api/qloo/status` returned
+`ready: false` with `harness spawn timeout`. Previous live Qloo runs succeeded,
+so diagnose current process readiness and rerun the visible journey. The
+official hackathon overview requires an externally hosted, fully published
+demo. None is verified, and `git remote -v` currently shows no remote; the
+earlier handoff's statement that a public repository exists was incorrect.
+`LICENSE` is present locally. Devpost's overview and rules differ on whether
+a password-protected demo qualifies; prefer an externally accessible demo
+with safe data. No code was changed in this audit, only root documentation.
+
+## Active checkpoint — instant example and clearer Qloo choice (2026-10-29)
+
+The user said to continue from the previous handoff. We followed the first
+two priorities in `docs/PRODUCT_IMPLEMENTATION_PLAN.md` while preserving the
+uncommitted comparison-page removal.
+
+### Done
+
+- Added `frontend/app/decision/sampleDecision.ts`, an entirely invented,
+  read-only example with two sample venues, three artists, a sample partner,
+  `urn:sample` IDs, source-shaped rows, a rank-changing audience scenario,
+  and a sample pilot plan. The workspace opens it instantly from **See an
+  illustrative decision** and returns to the live brief with **Start your own
+  decision**. The example makes no Qloo request, is not saved, hides the live
+  brief and export/replay/selection/outcome controls, and says no event or outcome has
+  occurred. It is a UI fixture, not a real Qloo response or customer story.
+- Improved the live concept ambiguity chooser in
+  `frontend/app/decision/page.tsx` and `decision.css`: category, venue style,
+  amenity, dining option, product/service, activity, setting and other known
+  tag types now have plain-language descriptions. Place-category choices are
+  visually distinguished but never selected automatically. Artist choices
+  still expose their record IDs because the backend does not provide enough
+  metadata to distinguish identical names.
+- Updated the relevant expectations in `frontend/e2e/decision.spec.ts` and
+  described the new state in `README.md`, `docs/CURRENT_FUNCTIONALITY.md`,
+  and `docs/PRODUCT_IMPLEMENTATION_PLAN.md`.
+- Frontend lint, TypeScript production build, and `git diff --check` passed.
+  In the live browser, the sample opened instantly and the real cocktail-bar
+  brief reached the new chooser. Selecting the place-category match produced
+  three live Qloo options; the evidence drawer showed the selected
+  `urn:tag:category:place:cocktail_bar` ID. This was a local synthetic brief,
+  not validation of venue usefulness. The backend suite was not rerun because
+  no backend code changed.
+- Ran `graphify update .` after code changes: 810 nodes, 1,798 edges, 45
+  communities. The installed uv launcher still needs an escalated invocation
+  in this sandbox. Keep using Graphify before code searches as `AGENTS.md`
+  requires.
+
+### Next work
+
+1. Have someone unfamiliar with the app try the instant example and live
+   path. Check whether the example labeling is unmistakable and whether the
+   choice cards make sense without builder narration. The live tag chooser
+   was tested; identical-name artist choices still need richer Qloo metadata
+   or a clearly bounded no-choice state.
+2. Work through the three synthetic briefs in `docs/VALIDATION.md`. Its
+   current gap assessment is still accurate: amplified-sound cutoff,
+   capacity, all-ages and known fees are not hard constraints, and maker/film
+   programming is outside the current artist-led wedge. Do not mark the
+   benchmark gate passed from the browser smoke test.
+3. Audit the legacy `/api/agent/*` backend and its dependency on `Engine`
+   before removing it. The product frontend does not use it, but the same
+   engine module currently imports legacy agent/provider classes. Avoid
+   a rushed deletion that destabilizes the decision path.
+4. Build and smoke-test a judge-accessible deployment once AWS access and
+   paid provisioning are resolved. Current saved decisions have no user
+   ownership; keep the preview protected. A local license file exists, but
+   this checkout has no Git remote and the hosted demo has not been verified.
+
+### Local state
+
+The live chooser check created local decision `dec_0fee574664d0` for
+`Tastewell test room`. It is test data, not an operator record. The earlier
+`dec_72d06494c44b` contains a clearly synthetic sample outcome. No code
+was committed or deployed during this continuation; preserve the working
+tree.
+
+## Active checkpoint — comparison page retired (2026-10-28)
+
+### Intent and decision
+
+The user asked whether to remove **Compare Qloo**, because it does not fit
+Tastewell's operator workflow, and to update the implementation plan. We
+decided to make the venue programming decision workspace the sole product
+journey. The 2026-10-28 live browser test justified the change: the main
+decision flow returned three Qloo-sourced artist pilots, changed the first
+two ranks under a new audience, saved a plan and a clearly synthetic outcome,
+and replayed its evidence. The separate comparison page gave no grounded
+brief for a listening bar despite three successful Qloo envelopes; a jazz
+club run showed tags but left actionable sections blank. The separate page
+is a weak demonstration and distracts from the useful decision workflow.
+
+### Done in this continuation
+
+- Removed the public `/compare` Next.js route, its top-bar link, old dual-pane
+  app/components/CSS, and the two browser specs dedicated to that page.
+  `/` and `/decision` still render `frontend/app/decision/page.tsx`.
+- Simplified `frontend/lib/api.ts` to the shared backend base URL; the product
+  frontend no longer calls the old `/api/agent/*` endpoints. Those backend
+  endpoints and agent internals remain for an explicit dependency audit.
+- Updated `docs/PRODUCT_IMPLEMENTATION_PLAN.md` with the one-journey scope,
+  live findings, ordered next slice, and corrected stale resume notes.
+  Updated `README.md`, `PRODUCT.md`, `DESIGN.md`, and
+  `docs/CURRENT_FUNCTIONALITY.md` to match the current product surface.
+- Verified `npm run lint` and `npm run build` in `frontend/` passed. The
+  production route list contains `/`, `/decision`, and `/_not-found`, with no
+  `/compare`. In the live browser, the main navigation link was gone after a
+  reload and direct `/compare` returned 404. `git diff --check` returned no
+  whitespace errors (only Git's LF-to-CRLF notices).
+- Ran `graphify update .` after code edits: 799 nodes, 1,784 edges, 45
+  communities. The default sandbox could not launch the installed uv
+  trampoline, so the local Graphify update required an escalated run. Do not
+  treat dirty graph output as a reason to skip Graphify.
+
+### Next work
+
+1. Keep `/compare` retired. Audit callers and tests of `/api/agent/*`,
+   `backend/app/agent/*`, and the legacy brief backend before deleting it;
+   preserve anything the decision path actually uses. The backend suite was
+   not rerun during this frontend/doc change.
+2. Follow the ordered slice in `docs/PRODUCT_IMPLEMENTATION_PLAN.md`:
+   an instant clearly synthetic decision example alongside the live path,
+   operator-friendly ambiguity choice, three benchmark journeys including
+   sparse evidence, keyboard/mobile checks, and a working hosted demo.
+3. Prepare a judge-accessible deployment and submission. The current app
+   still runs locally; the Compose/Caddy package has not had a Docker build
+   or hosted smoke test. Saved decision history has no per-user ownership, so
+   do not expose it without access control. Keep public-repo setup, visible
+   license, and testing instructions aligned with the actual deployment.
+4. Run focused decision browser checks, frontend lint/build, relevant
+   backend tests, and `graphify update .` after further code edits. Keep
+   real operator outcomes and synthetic examples explicitly distinct.
+
+### Local test data and working tree
+
+The prior live walkthrough saved decision `dec_72d06494c44b` in the local
+SQLite database with an outcome whose source explicitly says
+`TEST DATA — synthetic example, no actual event`. It also created replay
+`dec_f87f380e6ab9`. These are local demo records, not customer evidence.
+The working tree contains the comparison removal and documentation changes;
+do not reset or discard them. No public deployment or Devpost submission was
+made in this continuation.
 
 ## 2026-10-28 deployment decision
 
