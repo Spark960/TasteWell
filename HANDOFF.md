@@ -19,13 +19,15 @@ supersedes the older statement below that the instance is only prepared.
 - The server's gitignored `/home/ubuntu/tastewell/.env` is mode 600 and has
   non-secret Qloo host settings, OpenRouter provider/model, and a generated
   64-character session signing secret. Its `QLOO_API_KEY` and
-  `OPENROUTER_API_KEY` values are **empty**. The user explicitly chose to enter
-  those keys themselves in the Lightsail SSH terminal. Do not read or print
-  their values. The mode-600 `/home/ubuntu/tastewell-runtime.env` has the
+  `OPENROUTER_API_KEY` values were initially empty; the user says they have now
+  entered both keys in the Lightsail SSH terminal. Verify presence by length
+  only; do not read or print their values. The mode-600
+  `/home/ubuntu/tastewell-runtime.env` has the
   hostname, 80/443 binds, username `judge`, and an empty
   `ACCESS_PASSWORD_HASH`. The user is also setting their own demo password and
-  entering its Caddy hash. An async request is pending for them to say
-  “credentials ready” when finished.
+  entering its Caddy hash. Browser control policy requires the user to enter
+  this new authentication credential themselves. An async request is pending
+  for them to say “password hash ready” when finished.
 - Once the user finishes: verify only key/hash presence and file modes without
   displaying values. Run `sudo docker compose --env-file
   /home/ubuntu/tastewell-runtime.env -f deploy/compose.yaml config --quiet`,
