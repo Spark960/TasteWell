@@ -215,6 +215,20 @@ sudo docker compose --env-file /home/ubuntu/tastewell-runtime.env -f deploy/comp
 
 Cloud Qloo readiness and a real agent review are required gates. A healthy /api/health response alone does not prove Qloo works. The optional deploy/smoke_test.sh script can run from Git Bash/WSL with TASTEWELL_URL, ACCESS_USER, and ACCESS_PASSWORD set locally; avoid putting the plaintext password in a committed file or a shared shell history.
 
+For a repeatable private backend journey, run the following from the server's
+repository directory. It creates one clearly synthetic decision, resolves the
+expected Qloo jazz tag if needed, runs the bounded agent review, and checks the
+saved action record. It prints IDs and statuses only. The review may recommend,
+request an operator fact, or abstain; inspect its evidence before making any
+submission claim about recommendation quality.
+
+~~~bash
+sudo docker compose --env-file /home/ubuntu/tastewell-runtime.env -f deploy/compose.yaml exec -T backend python - < deploy/cloud_journey_smoke.py
+~~~
+
+The public smoke script now checks Qloo readiness as well as HTTPS, Basic Auth,
+health, and the decision page. It does not create a decision or call the model.
+
 ### Step 9 — Back up, monitor, update, and stop
 
 The database lives in Docker's **tastewell_decision_data** volume on this instance. At least weekly, and before each update, make a backup **outside that volume**. The simplest consistent copy pauses the backend briefly. Run in Ubuntu:
