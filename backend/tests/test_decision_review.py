@@ -91,6 +91,25 @@ async def test_invalid_citation_repairs_then_abstains():
 
 
 @pytest.mark.asyncio
+async def test_unknown_fee_alone_prompts_repair_to_grounded_proposal():
+    d = decision()
+    provider = Provider([
+        Reply(tool_calls=[{"id": "t1", "name": "inspect_option", "args": {"option_id": "o1"}},
+                          {"id": "t2", "name": "check_venue", "args": {"venue_id": "v1"}}]),
+        Reply(content=json.dumps({"status": "abstain",
+                                  "reason": "Budget feasibility is unverified without a fee quote"})),
+        Reply(content=json.dumps(recommendation())),
+    ])
+    review = await run_decision_review(
+        d, ReviewRequest(snapshot_fingerprint=evidence_fingerprint(d)), provider,
+    )
+    assert review.status == "recommend"
+    assert review.option_id == "o1"
+    assert review.next_check == "Verify artist availability and fee."
+    assert provider.calls == 3
+
+
+@pytest.mark.asyncio
 async def test_review_rejects_nonready_and_stale_snapshot():
     d = decision()
     fp = evidence_fingerprint(d)
