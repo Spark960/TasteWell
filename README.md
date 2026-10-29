@@ -1,16 +1,18 @@
 # Tastewell
 
-Tastewell helps a venue operator choose a programming pilot across one or
-more venues. It resolves a concept
-and artist shortlist with Qloo, compares the same artist IDs per venue,
-shows inspectable evidence, and saves the selected pilot and outcome. The
-source queries and changed-audience or changed-region ranks show how Qloo
-informs a specific decision.
+**Choose an artist and venue for one live-music test.** Tastewell asks who you
+want to reach, uses Qloo to find and rank artists for your venue, and shows the
+sources behind each option. An agent reviews those results and suggests a
+small pilot. You make the final call after checking costs and availability.
+
+**Why Qloo matters:** Change the audience or region and Tastewell reranks the
+*same artists*. You can see when the cultural evidence changes the choice,
+instead of accepting a generic AI suggestion.
 
 **Hosted preview:** [Open the Tastewell decision workspace](https://tastewell.35-154-50-144.sslip.io/decision).
-The small AWS demo is password protected. Access details and a complete judge
-walkthrough are below. Use the live brief for Qloo-backed results. The instant
-illustrative decision is invented and clearly labeled.
+The demo is password protected. Access details and a short judge walkthrough
+are below. The instant example is invented and labeled; create a new decision
+to see live Qloo results.
 
 
 ## Judge access and testing
@@ -24,24 +26,25 @@ Password: spark123
 ```
 It was added in additional info for judges too
 
-The demo is free to use during judging. To inspect the product quickly, choose
-**See an illustrative decision**. This read-only example uses invented names,
-IDs, and ranks and makes no Qloo call. For a live Qloo-backed test:
+**Fast path:** Choose **See an illustrative decision** to inspect a completed
+example immediately. It is read-only, uses invented data, and makes no Qloo
+call.
 
-1. Choose **Start your own decision** and enter a synthetic brief: venue
-   `Judge test listening room`, concept `jazz`, region `Brooklyn, New York`,
-   and audience `millennials`.
-2. If Qloo presents multiple concept matches, choose the music-genre jazz tag.
-   Wait for the decision job to finish, then review the artist options and open
-   **Inspect Qloo evidence** to see the source IDs and queries.
-3. Run **Review the pilot choice** to see the bounded agent's cited proposal,
-   actions, alternatives, and unknowns. The operator makes the final selection.
-4. Change the scenario region to `Los Angeles, California` and choose
-   **Compare scenario**. The app reranks the same artist IDs and shows any
-   movement without treating scores from separate calls as directly comparable.
-5. Reopen the decision from saved history or export its JSON to inspect the
-   retained evidence and review. Test decisions are synthetic; do not record
-   a real-world outcome for this walkthrough.
+**Live Qloo path:**
+
+1. Enter venue `Judge test listening room`, concept `jazz`, region `Brooklyn,
+   New York`, audience `millennials`, and objective `Choose an artist for a
+   quiet weeknight`. Keep **Live music is permitted at this venue** checked,
+   then start the decision. If asked, select the music-genre jazz tag.
+2. Compare the artists, open **Inspect Qloo evidence**, then choose
+   **Review the pilot choice**. The agent suggests a pilot and cites its
+   sources; you still decide whether to select it.
+3. Change the scenario region to `Los Angeles, California` and choose
+   **Compare scenario**. See whether the *same artists* move in the ranking.
+   Saved history and JSON export let you revisit the evidence.
+
+The brief and decisions in this walkthrough are synthetic. Do not record a
+real-world outcome for the test.
 
 Live Qloo results may vary by audience and region, so exact artist names and
 rank changes are not guaranteed on every run. The [official hackathon rules](https://qloo.devpost.com/rules)
@@ -49,9 +52,8 @@ allow private demos when login credentials are provided in testing instructions.
 
 ## Why Qloo
 
-A generic model can suggest a playlist or a menu theme, but it cannot establish
-which cultural signals are connected in Qloo's graph for the requested audience
-and area. Tastewell's decision pipeline uses the Qloo harness over MCP:
+Qloo supplies cultural relationships for the audience and area. Tastewell uses
+the Qloo harness over MCP to turn those relationships into a checkable choice:
 
 1. `find_tags` resolves the venue concept into candidate Qloo tag IDs, with a
    human choice when the match is ambiguous.

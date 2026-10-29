@@ -388,21 +388,21 @@ export default function DecisionPage() {
     <aside className="decision-rail" aria-label="Decision guide">
       <div className="decision-rail-inner">
         <p className="decision-rail-label">Your decision trail</p>
-        <h2>Better nights start with better questions.</h2>
-        <p className="decision-rail-copy">Build a small, evidence-backed shortlist. Then choose a room, name the unknowns, and record what actually happened.</p>
+        <h2>Choose one night to test.</h2>
+        <p className="decision-rail-copy">Compare artists for your venue, check the sources, and plan a small live-music pilot.</p>
         <ol className="decision-steps">
-          <li className="is-active"><span>1</span><div><strong>Set the brief</strong><small>Rooms, audience &amp; limits</small></div></li>
-          <li className={decision?.options.length ? "is-active" : ""}><span>2</span><div><strong>Explore options</strong><small>Ranks &amp; source evidence</small></div></li>
-          <li className={decision?.selected_option_id ? "is-active" : ""}><span>3</span><div><strong>Plan the pilot</strong><small>Owner, timing &amp; measure</small></div></li>
-          <li className={decision?.outcome ? "is-active" : ""}><span>4</span><div><strong>Record the outcome</strong><small>What your own data shows</small></div></li>
+          <li className="is-active"><span>1</span><div><strong>Describe your venue</strong><small>Audience and limits</small></div></li>
+          <li className={decision?.options.length ? "is-active" : ""}><span>2</span><div><strong>Compare artists</strong><small>Qloo ranks and sources</small></div></li>
+          <li className={decision?.selected_option_id ? "is-active" : ""}><span>3</span><div><strong>Choose a pilot</strong><small>Who, where, and when</small></div></li>
+          <li className={decision?.outcome ? "is-active" : ""}><span>4</span><div><strong>Record the result</strong><small>What happened</small></div></li>
         </ol>
-        <div className="decision-rail-note"><strong>What Qloo brings</strong><p>Aggregate cultural signals to compare a shortlist. Availability, costs, and results stay with your team.</p></div>
+        <div className="decision-rail-note"><strong>What Qloo tells you</strong><p>Which artists fit this audience and area. Your team still checks booking, costs, and results.</p></div>
       </div>
     </aside>
     <main className="decision-main">
     <section className="decision-intro">
-      <h1>Make the next night count.</h1>
-      <p>Find an artist-led pilot that fits your audience and your venues. Keep the evidence and the operational questions together as you decide.</p>
+      <h1>Find the right artist for your next venue night.</h1>
+      <p>Tell us about your venue and audience. Qloo ranks artist options, and an agent explains a small pilot with sources and open questions. You make the final choice.</p>
       <div className="decision-scope"><span className="decision-scope-dot" />Currently exploring <strong>live music</strong> <span aria-hidden="true">·</span> Up to 10 venues</div>
       <div className="decision-example-action">
         <button type="button" onClick={isSample ? closeSample : showSample}>
@@ -421,7 +421,7 @@ export default function DecisionPage() {
           <span className="block text-xs text-zinc-500">{item.source_mode === "replay" ? "Replay · " : ""}{item.has_outcome ? "Outcome recorded" : item.selected_option_id ? "Pilot selected" : item.status} · {item.updated_at}</span>
         </button>)}</div></section>}
     {!isSample && <form id="decision-brief" onSubmit={(event) => { event.preventDefault(); void create(); }} className="decision-form rounded-xl border border-zinc-700 bg-zinc-900 p-5">
-      <div className="decision-form-heading"><div><h2>Shape your pilot brief</h2><p>Start with the venue and the people you want to reach.</p></div><span>01 / Brief</span></div>
+      <div className="decision-form-heading"><div><h2>Tell us about your venue</h2><p>Describe the room, audience, and decision you need to make.</p></div><span>01 / Brief</span></div>
       <div className="grid gap-4 sm:grid-cols-2">{fields.map(({ key, label, placeholder }) =>
         <label key={key} className="text-sm text-zinc-300">{label}
           <input required={key !== "budget_limit"} type={key === "budget_limit" ? "number" : "text"}
