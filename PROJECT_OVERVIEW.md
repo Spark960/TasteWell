@@ -14,7 +14,11 @@ Updated 2026-10-29. This is the root status for the Qloo Agentic Hackathon submi
 | Qloo as the differentiator | Option names and ordinal ranks depend on Qloo-resolved IDs and responses. The illustrative example is explicitly invented. | Brooklyn-to-Los Angeles comparison moved two of three artists on the same shortlist; source queries were inspectable. |
 | Judge-accessible submission | [Hosted preview](https://tastewell.35-154-50-144.sslip.io/decision), [public repository](https://github.com/Spark960/TasteWell), MIT license detected by GitHub, and private-window Basic Auth sign-in confirmed by the user. | [Devpost entry](https://devpost.com/software/tastewell-yi3k57) submitted with judge-only access instructions and two clearly labeled illustrative screenshots. Overview and official rules conflict on whether a password-protected demo qualifies. |
 
-The official [rules](https://qloo.devpost.com/rules) permit a private test site when judges receive credentials, while the [overview](https://qloo.devpost.com/) says private-access-only demos do not qualify. The current preview uses Basic Auth to protect API quota and decision data. Resolve that eligibility risk in the final submission path.
+## Submission status
+
+The [Tastewell Devpost entry](https://devpost.com/software/tastewell-yi3k57) was submitted to the Qloo Agentic Hackathon on 2026-10-29. Devpost showed both “Project submitted!” and “Submitted to Qloo Agentic Hackathon.” The entry includes the hosted demo, public repository, judge-only access instructions, and two gallery screenshots labeled as an invented illustrative sample. The user saved the existing demo password directly in Devpost's judge-only field and verified that the demo opens with those credentials in a private browser window. Do not put the password in this repository.
+
+The preview uses Basic Auth to protect API quota and decision data. The official [rules](https://qloo.devpost.com/rules) permit a private test site when judges receive credentials, while the [overview](https://qloo.devpost.com/) says private-access-only demos do not qualify. This eligibility ambiguity remains for the organizer to decide; submission is complete.
 
 ## Product that exists now
 
