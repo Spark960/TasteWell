@@ -17,7 +17,12 @@ import urllib.request
 
 
 BASE = "http://127.0.0.1:8000"
-cookies = http.cookiejar.CookieJar()
+# This client talks to the backend over container loopback, while production
+# correctly marks browser sessions Secure for public HTTPS. Permit that cookie
+# on this trusted loopback test client so follow-up calls retain ownership.
+cookies = http.cookiejar.CookieJar(
+    policy=http.cookiejar.DefaultCookiePolicy(secure_protocols=("https", "wss", "http"))
+)
 opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookies))
 
 
