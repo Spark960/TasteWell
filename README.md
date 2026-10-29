@@ -1,7 +1,7 @@
 # Tastewell
 
 Tastewell helps a venue operator choose a programming pilot across one or
-more venues. The workspace at `/` (also available at `/decision`) resolves a concept
+more venues. It resolves a concept
 and artist shortlist with Qloo, compares the same artist IDs per venue,
 shows inspectable evidence, and saves the selected pilot and outcome. The
 source queries and changed-audience or changed-region ranks show how Qloo
@@ -11,8 +11,7 @@ informs a specific decision.
 The small AWS demo is password protected. Access details and a complete judge
 walkthrough are below. Use the live brief for Qloo-backed results. The instant
 illustrative decision is invented and clearly labeled.
-The [Devpost entry](https://devpost.com/software/tastewell-yi3k57) was submitted
-to the Qloo Agentic Hackathon on 2026-10-29.
+
 
 ## Judge access and testing
 
@@ -21,8 +20,9 @@ When the browser asks for HTTP Basic Authentication, enter:
 
 ```text
 Username: judge
-Password: the value in the Devpost submission's judge-only Additional info
+Password: spark123
 ```
+It was added in additional info for judges too
 
 The demo is free to use during judging. To inspect the product quickly, choose
 **See an illustrative decision**. This read-only example uses invented names,
