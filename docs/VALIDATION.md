@@ -25,9 +25,25 @@ deselected.
 The first hosted review abstained solely because a fee was unknown. That
 violated the pilot proposal contract, so the agent prompt, venue tool result,
 and validation repair were corrected and a regression test added. The next
-hosted run returned a recommendation. These are technical checks on a
-synthetic brief; public browser sign-in and end-to-end UI inspection remain
-pending, and this result does not establish usefulness for a real operator.
+hosted run returned a recommendation.
+
+The public browser path was then verified with the user's chosen Basic Auth
+credential. A fresh synthetic jazz brief reached the ambiguity chooser;
+choosing the music-genre tag produced three options with saved source rows.
+The agent review proposed an early live set, showed three Qloo citations,
+two inspected actions, alternatives, unknowns, and a next check. A citation
+opened the saved tag, artist, and rank rows with IDs, queries, correlation IDs,
+and retrieval times. Saved decisions reopened the review. A separate
+fixed-ID comparison changed the region from Brooklyn to Los Angeles:
+Braxton Cook moved from rank 2 to 3, Ibeyi stayed at 1, and Jesse Boykins III
+moved from 3 to 2. The UI correctly marked the earlier review stale.
+
+When offered the alternate region inside a second agent review, the model
+made a new recommendation from saved evidence without requesting the optional
+Qloo comparison. The action record therefore has no comparison call for that
+review; the explicit scenario form did run the Qloo rank call. This is a
+technical check on a synthetic brief, not evidence of operator usefulness or
+business impact. An independent judge or operator walkthrough is still open.
 
 ## Published proxy evidence (not interviews)
 

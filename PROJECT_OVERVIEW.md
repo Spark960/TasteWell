@@ -4,17 +4,17 @@ Updated 2026-10-29. This is the root status for the Qloo Agentic Hackathon submi
 
 ## Verdict against the hackathon requirement
 
-**Code-level Qloo integration: yes. A bounded agent review is visible in the product. Submission-ready: no.** The [hackathon overview](https://qloo.devpost.com/) asks for a working Qloo-powered application that is an agentic tool, uses an agent framework, or connects Qloo to an existing agent. Those are alternatives; the app does not need to recommend across every cultural category. The current product focuses on live-music programming, with place/concept tags and optional brand affinities.
+**Working hosted Qloo integration and a visible bounded agent review: yes. Submission-ready: not yet.** The [hackathon overview](https://qloo.devpost.com/) asks for a working Qloo-powered application that is an agentic tool, uses an agent framework, or connects Qloo to an existing agent. Those are alternatives; the app does not need to recommend across every cultural category. Tastewell focuses on live-music programming, with place/concept tags and optional brand affinities.
 
 | Requirement | Current evidence | Assessment |
 | --- | --- | --- |
-| Working software application | Next.js decision workspace, FastAPI decision API, SQLite snapshots, local end-to-end browser checks. | Working local prototype; clean install and hosted operation still need verification. |
-| Qloo API integration and cultural grounding | The backend uses the Qloo MCP harness to call `find_tags`, `describe` or `recommend`, and `rank`. It stores query context, Qloo IDs, status, and source rows. Missing evidence does not become a fabricated option. | A longer MCP handshake succeeds locally and a fresh synthetic two-artist run produced complete ranks. Hosted readiness remains untested. |
-| Agentic tool, framework, or existing agent | The workspace now invokes a bounded LLM review of a saved Qloo decision. It can inspect option and venue facts, request one operator-confirmed scenario rank, and produce a validated proposal or abstain. | Implemented and exercised locally with live Qloo and a model. The reviewer must still see it on a hosted build before calling the submission ready. |
-| Qloo as the differentiator | The option names and ranks depend on Qloo-resolved artist IDs and responses; the same saved shortlist can change order under a new audience or region. The illustrative example is explicitly invented and makes no Qloo call. | Strong product rationale, but a judge needs a reliable live path and a clear explanation of what Qloo changed. |
-| Judge-accessible submission | The [hackathon page](https://qloo.devpost.com/) requires an externally hosted, fully published functional demo, a public repository, description, and visible open-source license. | **Blocked.** This checkout is local only; no hosted smoke test or submission exists. `git remote -v` currently returns no configured remote. `LICENSE` exists locally, but a public repository and visible license have not been verified. |
+| Working software application | Next.js/FastAPI/SQLite on a 2 GB Lightsail host; three running services, valid HTTPS, live public-browser decision, and persisted review after backend restart. | Hosted technical path verified on a synthetic brief. Independent operator validation remains open. |
+| Qloo API integration and cultural grounding | The backend uses Qloo MCP `find_tags`, `recommend`/`describe`, and `rank`, storing IDs, queries, status, correlation, and retrieval times. | Hosted readiness was true. A public-browser run showed three artist options and a fixed-ID region comparison that changed two ranks. |
+| Agentic tool, framework, or existing agent | A bounded LLM review inspects saved option and venue facts, can request one Qloo scenario, and proposes a cited pilot or abstains. | Hosted browser showed a proposal, source links, actions, alternatives, unknowns, and next check. The operator retains the pilot selection. |
+| Qloo as the differentiator | Option names and ordinal ranks depend on Qloo-resolved IDs and responses. The illustrative example is explicitly invented. | Brooklyn-to-Los Angeles comparison moved two of three artists on the same shortlist; source queries were inspectable. |
+| Judge-accessible submission | [Hosted preview](https://tastewell.35-154-50-144.sslip.io/decision), [public repository](https://github.com/Spark960/TasteWell), MIT license detected by GitHub, and tested Basic Auth sign-in. | Devpost entry and testing instructions are not submitted. Overview and official rules conflict on whether a password-protected demo qualifies. |
 
-The official [rules](https://qloo.devpost.com/rules) also permit a private test site when judges receive credentials, while the overview says private-access-only demos do not qualify. Resolve that discrepancy before relying on the prepared Basic Auth preview. An externally reachable demo with safe sample data is the clearest route.
+The official [rules](https://qloo.devpost.com/rules) permit a private test site when judges receive credentials, while the [overview](https://qloo.devpost.com/) says private-access-only demos do not qualify. The current preview uses Basic Auth to protect API quota and decision data. Resolve that eligibility risk in the final submission path.
 
 ## Product that exists now
 
@@ -35,19 +35,18 @@ The app treats Qloo outputs as aggregate cultural signals. It does not infer ind
 | `backend/app/qloo/mcp_client.py` | Qloo MCP harness connection and typed tool-call normalization. |
 | `backend/app/agent/decision_review.py` | Four-turn model review with saved-evidence tools, one optional fixed-ID Qloo comparison, and strict output validation. |
 | `backend/app/agent/loop.py` | Existing LLM tool-calling agent; currently accessible only through the legacy API. |
-| `backend/app/api/decision_store.py` | SQLite decision records. No per-user ownership. |
-| `deploy/` | Prepared Compose/Caddy deployment package, not yet built or hosted. |
+| `backend/app/api/decision_store.py` | SQLite decision records with signed production browser-session ownership. |
+| `deploy/` | Running Compose/Caddy package, public HTTPS, Basic Auth, and repeatable cloud smoke checks. |
 
-Previous local live browser checks completed a Qloo-backed decision with three artist options, an audience rerank, a pilot plan, and evidence inspection. On 2026-10-29, a fresh synthetic live browser journey resolved an ambiguous concept, ranked two public artists within one venue call, and the bounded model review inspected the option and venue before proposing a cited pilot. The saved review reopened with its action record. These are developer tests, not operator validation or proof of hosted reliability. The non-live backend suite passed 95 tests with 3 deselected; frontend lint, production build, and five mocked decision browser tests passed.
+On 2026-10-29, the public browser completed a fresh synthetic Qloo decision, agent review, saved-history reopen, and changed-region scenario. The scenario moved Braxton Cook from rank 2 to 3 and Jesse Boykins III from 3 to 2, while Ibeyi stayed at 1; the earlier review became stale. The backend's 98 non-live tests passed with 3 live tests deselected. Frontend lint, production build, and five mocked decision browser tests had passed before deployment. These are developer checks, not real operator validation.
 
-**Runtime check on 2026-10-29:** The installed Qloo MCP harness initialized with a longer handshake and exposed ten expected tools. The readiness timeout was increased from 15 to 45 seconds. The local sandbox required explicit access to the installed CLI; a hosted process remains untested.
+**Runtime check on 2026-10-29:** The hosted Qloo MCP harness reported `ready: true` with ten expected tools. A live decision and review ran on the 2 GB host, which had about 1.2 GiB available afterward. The $24 4 GB plan is not needed by the measured small demo workload.
 
 ## Immediate priorities
 
-1. Run a fresh Qloo decision and agent review through the visible UI with the final local backend and then the hosted build. Keep the illustrative fixture clearly separate.
-2. Confirm the review's grounding and failure paths with B1–B3 and an independent operator walkthrough. Preserve the focused venue-decision product.
-3. Complete the three synthetic benchmark briefs in [docs/VALIDATION.md](docs/VALIDATION.md), including sparse evidence and operational constraints. Seek an independent operator walkthrough; no buyer or impact validation is claimed.
-4. Publish and smoke-test a judge-accessible external demo with safe data, then connect and verify a public repository and visible license. This checkout has no Git remote configured. Keep saved decisions protected or isolated; there is no user-level access control.
-5. Prepare the Devpost description around a specific Qloo-dependent decision, exact tool calls, visible provenance, known limits, and truthful demo behavior. Submit before the published October 30, 2026 deadline (11:45 p.m. Eastern Time).
+1. Resolve the private-demo eligibility ambiguity in the [overview](https://qloo.devpost.com/) versus [rules](https://qloo.devpost.com/rules); if keeping Basic Auth, put the username and password in Devpost testing instructions, not the public repository.
+2. Check the hosted UI on a narrow mobile viewport and with keyboard navigation. Run B2/B3 sparse and unsupported-input cases from [docs/VALIDATION.md](docs/VALIDATION.md), then seek an independent walkthrough.
+3. Prepare the Devpost description around the specific rank-changing decision, exact Qloo calls, visible provenance, and known limits. Submit before October 30, 2026 at 11:45 p.m. Eastern Time, then verify the receipt.
+4. Tighten SSH access after confirming how Lightsail browser SSH will continue to work, and arrange an off-instance backup if the demo retains real data.
 
-Until the live Qloo path and external demo work, the project should be described as a **promising local Qloo-powered prototype**, not an eligible completed submission or a validated business.
+The app is a **hosted, technically verified Qloo-powered pilot tool**. It is not a validated business or a completed Devpost submission yet.

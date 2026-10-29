@@ -7,6 +7,11 @@ shows inspectable evidence, and saves the selected pilot and outcome. The
 source queries and changed-audience or changed-region ranks show how Qloo
 informs a specific decision.
 
+**Hosted preview:** [Open the Tastewell decision workspace](https://tastewell.35-154-50-144.sslip.io/decision).
+The small AWS demo is password protected; judges need the shared access details
+in the submission's testing instructions. Use the live brief for Qloo-backed
+results. The instant illustrative decision is invented and clearly labeled.
+
 ## Why Qloo
 
 A generic model can suggest a playlist or a menu theme, but it cannot establish
@@ -56,7 +61,8 @@ individual likes, what they will buy, or that a venue concept will succeed.
 - Bounded retries for transient provider/tool failures and malformed final
   model output. Failed runs surface an error rather than invented evidence.
 
-For a private AWS pilot, see the root [deployment guide](DEPLOYMENT.md).
+For the deployed AWS pilot and its repeatable smoke checks, see the root
+[deployment guide](DEPLOYMENT.md).
 
 ## Run locally
 
@@ -126,10 +132,14 @@ product is described in the
 
 ## Limitations and status
 
-Tastewell is currently a local prototype. A [private-preview Compose package](deploy/README.md)
-is prepared but has not been built on a Docker host or deployed. It uses one
-shared password rather than multi-user ownership. Do not expose the local
-decision API or its saved history publicly without an access-control layer.
+Tastewell runs as a small private preview on AWS Lightsail. A synthetic hosted
+journey exercised Qloo resolution and ranking, a cited agent recommendation,
+saved history, and persistence after backend restart. The public browser UI
+also completed a live brief, review, and fixed-ID region comparison. The
+instance has a shared demo password; production decision records are isolated
+by signed browser session, but there are no recoverable user accounts or
+measured production capacity. Do not remove the access gate without adding
+abuse controls for the paid Qloo/model calls.
 Concept resolution and recommendation coverage vary by audience and region.
 Qloo affinity is a cultural signal, not a demand or sales forecast. In-flight
 decision jobs reset when the backend restarts; completed

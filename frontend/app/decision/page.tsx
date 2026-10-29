@@ -609,7 +609,7 @@ export default function DecisionPage() {
                 onChange={(event) => setScenarioInput({ ...scenarioInput, region: event.target.value })}
                 className="mt-1 block w-full rounded-md border border-zinc-600 bg-zinc-950 p-2" />
             </label>
-            <button disabled={busy} className="rounded-md bg-amber-400 px-4 py-2 font-semibold text-zinc-950 disabled:opacity-50">Compare scenario</button>
+            <button disabled={busy} className="decision-primary rounded-md bg-amber-400 px-4 py-2 font-semibold text-zinc-950 disabled:opacity-50">Compare scenario</button>
           </form>}
           {(decision.scenarios || []).slice().reverse().map((scenario) =>
             <div id={`scenario-${scenario.id}`} key={scenario.id} className="mt-5 border-t border-zinc-700 pt-4 text-sm">
@@ -661,7 +661,7 @@ export default function DecisionPage() {
             className="mt-1 block w-full rounded-md border border-zinc-600 bg-zinc-950 p-2" />
         </label>
         <p className="mt-1 text-xs text-zinc-500">When supplied, this amount must not exceed the selected venue&apos;s budget ceiling. Unknown cost remains unverified.</p>
-        <button disabled={busy} className="mt-4 rounded-md bg-amber-400 px-4 py-2 font-semibold text-zinc-950">Record selection</button>
+        <button disabled={busy} className="decision-primary mt-4 rounded-md bg-amber-400 px-4 py-2 font-semibold text-zinc-950">Record selection</button>
       </form>}
       {decision.selected_option_id && <p className="mt-5 rounded-md border border-green-700 p-3 text-sm text-green-300">
         {isSample ? "Illustrative pilot plan" : "Selection recorded"} for {decision.venues.find((venue) => venue.id === decision.pilot_plan?.venue_id)?.name} on {decision.pilot_plan?.target_date}. Owner: {decision.pilot_plan?.owner}. Next: {decision.pilot_plan?.next_action}.</p>}
@@ -682,7 +682,7 @@ export default function DecisionPage() {
                 value={outcome[key]} onChange={(event) => setOutcome({ ...outcome, [key]: event.target.value })}
                 className="mt-1 block w-full rounded-md border border-zinc-600 bg-zinc-950 p-2" />
             </label>)}
-          <button disabled={busy} className="rounded-md bg-amber-400 px-4 py-2 font-semibold text-zinc-950 disabled:opacity-50">Record outcome</button>
+          <button disabled={busy} className="decision-primary rounded-md bg-amber-400 px-4 py-2 font-semibold text-zinc-950 disabled:opacity-50">Record outcome</button>
         </form>
       </div>}
     </section>}

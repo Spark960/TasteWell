@@ -28,7 +28,10 @@ An operator supplies a venue concept, audience, objective, one or more venues, p
 The name is Tastewell. Product language should be direct, careful about evidence, and useful to an operator making a practical decision.
 
 ## Evidence on Hand
-The repository has a working prototype and mocked browser journeys. It has no confirmed operator interviews, measured pilot uplift, or public deployment; the interface must not imply otherwise.
+The repository has a working hosted private preview, a live synthetic Qloo and
+agent browser journey, and mocked browser journeys. It has no confirmed
+operator interviews, measured pilot uplift, or open public access; the
+interface must not imply otherwise.
 
 ## Product Principles
 - Make the next decision and its required inputs clear.
